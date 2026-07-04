@@ -3,7 +3,6 @@
 Final year BS thesis project (Electrical Engineering, PIEAS, 2024) on designing and building the embedded control system for a 6 degree of freedom robotic arm, with a focus on precise motor control and a master-slave communication architecture over CAN bus.
 
 Supervisor: Dr. Nasir Rehman Jadoon
-Co-supervisor: Mr. Tanveer Abbas
 
 ## What this project does
 
