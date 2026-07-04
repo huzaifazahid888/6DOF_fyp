@@ -36,10 +36,9 @@ Each joint uses a closed-loop PID position controller based on encoder feedback.
 - SolidWorks for the mechanical CAD model
 - CoppeliaSim (V-REP) for simulation and validation before hardware testing
 
-## Repo contents
+##  Thesis Report  
 
-- `thesis.pdf` - full write-up including literature review, DH parameter derivation, kinematics equations, and simulation results
-- (add your firmware/code folders here as you upload them)
+You can read the complete report here:  [**6DOF_Control – Full PDF Report**](./6DOF_Robotic_Manipulator_Thesis.pdf)
 
 ## Notes
 
