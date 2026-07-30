@@ -4,8 +4,8 @@ Final year BS thesis project (Electrical Engineering, PIEAS, 2024) on designing 
 
 Supervisor: Dr. Nasir Rehman Jadoon
 
-<p align="center">
-<img src="6_DOF.png" width="650">
+<p align="left">
+<img src="6_DOF.png" width="400">
 </p>
 
 ## What this project does
