@@ -1,0 +1,264 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="pieas_6dof_arm">
+  <material name="base_gray">
+    <color rgba="0.33 0.38 0.43 1" />
+  </material>
+  <material name="slide_blue">
+    <color rgba="0.30 0.51 0.65 1" />
+  </material>
+  <material name="arm_blue">
+    <color rgba="0.23 0.49 0.66 1" />
+  </material>
+  <material name="arm_light">
+    <color rgba="0.65 0.70 0.74 1" />
+  </material>
+  <material name="tool_gray">
+    <color rgba="0.32 0.35 0.38 1" />
+  </material>
+  <link name="base_link">
+    <visual name="base_link_visual">
+      <origin xyz="-0.113622929253 -0.0451833597702 -0.0472692382633" rpy="1.5707963268 -1.03472785895e-13 -2.42251700177" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/base_link.stl" />
+      </geometry>
+      <material name="base_gray" />
+    </visual>
+    <collision name="base_link_collision">
+      <origin xyz="-0.113622929253 -0.0451833597702 -0.0472692382633" rpy="1.5707963268 -1.03472785895e-13 -2.42251700177" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/base_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.0746142583713 -0.0326016751849 -0.0390220325867" rpy="0 0 0" />
+      <mass value="2.78786851868" />
+      <inertia ixx="0.0601623743892" ixy="-0.0231749016154" ixz="0.0198890426679" iyy="0.0663467585271" iyz="0.0174115406571" izz="0.0469428717541" />
+    </inertial>
+  </link>
+  <link name="slide_link">
+    <visual name="slide_link_visual">
+      <origin xyz="-0.02 -0.0899198954059 0.000703314726334" rpy="0 0.0106113005392 1.57079632679" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/slide_link.stl" />
+      </geometry>
+      <material name="slide_blue" />
+    </visual>
+    <collision name="slide_link_collision">
+      <origin xyz="-0.02 -0.0899198954059 0.000703314726334" rpy="0 0.0106113005392 1.57079632679" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/slide_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.0442565395049 -0.00688661890439 -0.00501030348696" rpy="0 0 0" />
+      <mass value="1.27925394187" />
+      <inertia ixx="0.00345500882567" ixy="5.21466629094e-07" ixz="-1.50166049777e-05" iyy="0.00171410084141" iyz="-1.94566506382e-06" izz="0.00208419339419" />
+    </inertial>
+  </link>
+  <link name="shoulder_link">
+    <visual name="shoulder_link_visual">
+      <origin xyz="-3.28057514273e-06 -5.28344363053e-06 -1.94069760262e-11" rpy="3.67320496739e-06 3.67320525818e-06 1.31819064195e-11" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/shoulder_link.stl" />
+      </geometry>
+      <material name="arm_blue" />
+    </visual>
+    <collision name="shoulder_link_collision">
+      <origin xyz="-3.28057514273e-06 -5.28344363053e-06 -1.94069760262e-11" rpy="3.67320496739e-06 3.67320525818e-06 1.31819064195e-11" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/shoulder_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.0574078653502 -5.47631027084e-06 0.0524891184719" rpy="0 0 0" />
+      <mass value="1.1263238117" />
+      <inertia ixx="0.00208066448992" ixy="-5.49682688349e-13" ixz="1.08628727089e-08" iyy="0.0035632236717" iyz="-5.41735457284e-09" izz="0.0050380439923" />
+    </inertial>
+  </link>
+  <link name="elbow_link">
+    <visual name="elbow_link_visual">
+      <origin xyz="-0.0219006117041 -0.0370677362033 -0.0473956341845" rpy="3.14159265359 2.07389661e-13 1.56206968053" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/elbow_link.stl" />
+      </geometry>
+      <material name="arm_light" />
+    </visual>
+    <collision name="elbow_link_collision">
+      <origin xyz="-0.0219006117041 -0.0370677362033 -0.0473956341845" rpy="3.14159265359 2.07389661e-13 1.56206968053" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/elbow_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.056810692727 -0.00275330660781 -0.00289563418447" rpy="0 0 0" />
+      <mass value="0.222412505907" />
+      <inertia ixx="8.20263997316e-05" ixy="3.54036287565e-06" ixz="0" iyy="0.000487680906342" iyz="0" izz="0.00056594904882" />
+    </inertial>
+  </link>
+  <link name="forearm_link">
+    <visual name="forearm_link_visual">
+      <origin xyz="-0.00314998335683 0.00205203485355 -0.0598821071591" rpy="-6.20659773576e-13 6.19282403136e-13 -0.0523598775597" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/forearm_link.stl" />
+      </geometry>
+      <material name="arm_blue" />
+    </visual>
+    <collision name="forearm_link_collision">
+      <origin xyz="-0.00314998335683 0.00205203485355 -0.0598821071591" rpy="-6.20659773576e-13 6.19282403136e-13 -0.0523598775597" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/forearm_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.027572242842 0.0011781122248 -0.000388327685875" rpy="0 0 0" />
+      <mass value="0.190850084278" />
+      <inertia ixx="6.8244415779e-05" ixy="5.15665819255e-06" ixz="1.80106604698e-08" iyy="0.000249922065697" iyz="-2.8888299329e-08" izz="0.000312526128446" />
+    </inertial>
+  </link>
+  <link name="wrist_link">
+    <visual name="wrist_link_visual">
+      <origin xyz="0.00412929670069 0.000175101273392 0.0499053645979" rpy="3.14159265359 1.06137321154e-13 0.593411945678" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/wrist_link.stl" />
+      </geometry>
+      <material name="arm_light" />
+    </visual>
+    <collision name="wrist_link_collision">
+      <origin xyz="0.00412929670069 0.000175101273392 0.0499053645979" rpy="3.14159265359 1.06137321154e-13 0.593411945678" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/wrist_link.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.0074951984155 0.016502274582 -0.00105181078086" rpy="0 0 0" />
+      <mass value="0.193165266443" />
+      <inertia ixx="8.38551890925e-05" ixy="-1.17601832942e-06" ixz="1.23534550029e-06" iyy="0.000108238656016" iyz="4.24587358143e-08" izz="0.000149288734218" />
+    </inertial>
+  </link>
+  <link name="rg2_link">
+    <visual name="rg2_visual">
+      <origin xyz="0.000964214784228 -0.00106034677491 -0.00463968171153" rpy="2.24709140184e-13 -6.06625860655e-13 3.05432619099" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/rg2_visual.stl" />
+      </geometry>
+      <material name="tool_gray" />
+    </visual>
+    <collision name="rg2_collision">
+      <origin xyz="0.000964214784228 -0.00106034677491 -0.00463968171153" rpy="2.24709140184e-13 -6.06625860655e-13 3.05432619099" />
+      <geometry>
+        <mesh filename="package://pieas_arm_description/meshes/rg2_collision.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.000903232647258 -0.00105425323095 0.128973590649" rpy="0 0 0" />
+      <mass value="0.649949986488" />
+      <inertia ixx="0.00371822214612" ixy="2.36501434903e-07" ixz="-7.37576072103e-07" iyy="0.00372085974748" iyz="8.18409248667e-08" izz="0.000677826923749" />
+    </inertial>
+  </link>
+  <link name="tool0" />
+  <joint name="tool0_fixed" type="fixed">
+    <parent link="rg2_link" />
+    <child link="tool0" />
+    <origin xyz="0.00152937072616 -9.56811660029e-05 0.195355912714" rpy="3.14159265359 2.0650148258e-13 1.57046745796" />
+  </joint>
+  <link name="world" />
+  <joint name="base_mount" type="fixed">
+    <parent link="world" />
+    <child link="base_link" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+  <joint name="joint_1" type="prismatic">
+    <parent link="base_link" />
+    <child link="slide_link" />
+    <origin xyz="0 0 0.0940007617367" rpy="-3.13112067808 1.57079632679 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="50" velocity="0.05" lower="-0.5" upper="0.5" />
+  </joint>
+  <joint name="joint_2" type="revolute">
+    <parent link="slide_link" />
+    <child link="shoulder_link" />
+    <origin xyz="-0.15724 2.35953659804e-06 -3.65214317016e-06" rpy="1.57079265357 1.56395062626 -1.57079632681" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+  </joint>
+  <joint name="joint_3" type="revolute">
+    <parent link="shoulder_link" />
+    <child link="elbow_link" />
+    <origin xyz="-4.11575832122e-06 -2.94129452787e-06 0.139410171371" rpy="-1.57078947493 0.00132489761668 -1.83173785084e-06" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+  </joint>
+  <joint name="joint_4" type="revolute">
+    <parent link="elbow_link" />
+    <child link="forearm_link" />
+    <origin xyz="0.162775198791 -0.00042495666064 0.000596459765891" rpy="6.19476692165e-13 -7.34640979516e-06 -0.00872664626018" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+  </joint>
+  <joint name="joint_5" type="revolute">
+    <parent link="forearm_link" />
+    <child link="wrist_link" />
+    <origin xyz="0.0998642916392 0.000765100000294 0.000352518473079" rpy="-7.34641081236e-06 4.26991775271e-13 -0.0285178775596" />
+    <axis xyz="0 0 1" />
+    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+  </joint>
+  <joint name="joint_6" type="continuous">
+    <parent link="wrist_link" />
+    <child link="rg2_link" />
+    <origin xyz="-0.00256243661576 0.0730297803899 2.84749661815e-06" rpy="-1.57078318135 0.0627019095197 0.0446507693344" />
+    <axis xyz="0 0 1" />
+    <limit effort="2.5" velocity="0.349065850399" />
+  </joint>
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="joint_1">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="joint_2">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="joint_3">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="joint_4">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="joint_5">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="joint_6">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+  </ros2_control>
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>@CONTROLLERS_FILE@</parameters>
+    </plugin>
+  </gazebo>
+</robot>

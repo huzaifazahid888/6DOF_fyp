@@ -8,6 +8,14 @@ Supervisor: Dr. Nasir Rehman Jadoon
 <img src="6_DOF.png" width="400">
 </p>
 
+## ROS 2 intelligent robotics lab
+
+I am extending this arm into a simulation project for motion planning, perception, and autonomous manipulation using ROS 2 Jazzy and Gazebo Harmonic.
+
+**[Open the robotics lab](robotics_lab/README.md)** · **[Setup and 12-stage roadmap](robotics_lab/START_HERE.md)**
+
+The starter includes the extracted URDF and meshes, a six-joint trajectory controller configuration, an overhead RGB-D camera, and a 3D LiDAR world. Configuration checks passed offline. Integrated Gazebo execution is pending. Gripper actuation, MoveIt integration, and autonomous grasping are planned milestones.
+
 ## What this project does
 
 The arm has 6 joints, and each joint is driven by its own DC motor controlled by a dedicated STM32F103C8T6 microcontroller. A separate STM32 acts as the master controller, computes the inverse kinematics for a given target position, and sends the required joint angles (as encoder counts) to each joint controller over CAN bus. Each slave controller then closes its own position control loop using encoder feedback and drives the motor through an IBT-2 driver until it reaches the target.

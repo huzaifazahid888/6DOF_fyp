@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.8)
+project(pieas_arm_description)
+find_package(ament_cmake REQUIRED)
+install(DIRECTORY meshes urdf config launch worlds DESTINATION share/${PROJECT_NAME})
+ament_package()

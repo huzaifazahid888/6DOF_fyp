@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="lab">
+    <physics name="physics" type="ignored"><max_step_size>0.001</max_step_size><real_time_factor>1</real_time_factor></physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <light name="sun" type="directional"><pose>0 0 5 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><direction>-0.3 -0.4 -1</direction></light>
+    <model name="ground"><static>true</static><link name="ground_link">
+      <collision name="collision"><geometry><plane><normal>0 0 1</normal><size>4 4</size></plane></geometry></collision>
+      <visual name="visual"><geometry><plane><normal>0 0 1</normal><size>4 4</size></plane></geometry><material><ambient>0.7 0.7 0.7 1</ambient></material></visual>
+    </link></model>
+    <model name="camera_rig"><static>true</static><pose>0 0 1 0 1.57079632679 0</pose><link name="camera_link">
+      <sensor name="rgbd" type="rgbd_camera">
+        <always_on>true</always_on><update_rate>10</update_rate><topic>/rgbd</topic>
+        <gz_frame_id>camera_optical_frame</gz_frame_id>
+        <camera><horizontal_fov>1.0472</horizontal_fov><image><width>640</width><height>480</height><format>R8G8B8</format></image><clip><near>0.05</near><far>3</far></clip><depth_camera><clip><near>0.05</near><far>3</far></clip></depth_camera></camera>
+      </sensor>
+    </link></model>
+    <model name="lidar_rig"><static>true</static><pose>-0.6 0 0.65 0 0 0</pose><link name="lidar_link">
+      <sensor name="lidar" type="gpu_lidar">
+        <always_on>true</always_on><update_rate>10</update_rate><topic>/lidar</topic><gz_frame_id>lidar_link</gz_frame_id>
+        <lidar><scan><horizontal><samples>360</samples><resolution>1</resolution><min_angle>-1.5708</min_angle><max_angle>1.5708</max_angle></horizontal><vertical><samples>32</samples><resolution>1</resolution><min_angle>-1.0472</min_angle><max_angle>0.1745</max_angle></vertical></scan><range><min>0.05</min><max>3</max><resolution>0.005</resolution></range><noise><type>gaussian</type><mean>0</mean><stddev>0.002</stddev></noise></lidar>
+      </sensor>
+    </link></model>
+  </world>
+</sdf>
