@@ -61,7 +61,7 @@ packages=(
     ca-certificates curl git python3 build-essential cmake
     python3-colcon-common-extensions python3-rosdep python3-yaml
     ros-jazzy-desktop ros-jazzy-ros-gz ros-jazzy-gz-ros2-control
-    ros-jazzy-ros2-controllers ros-jazzy-controller-manager
+    ros-jazzy-ros2-controllers ros-jazzy-controller-manager ros-jazzy-ros2controlcli
     ros-jazzy-robot-state-publisher ros-jazzy-tf2-ros
     ros-jazzy-ament-cmake ros-jazzy-ament-index-python
     ros-jazzy-launch ros-jazzy-launch-ros
@@ -98,6 +98,7 @@ verify_runtime() {
     for package in ros_gz_sim ros_gz_bridge gz_ros2_control robot_state_publisher joint_trajectory_controller; do
         ros2 pkg prefix "$package" >/dev/null || return 1
     done
+    ros2 control --help >/dev/null || return 1
     command -v colcon >/dev/null || return 1
     command -v rosdep >/dev/null || return 1
     command -v gz >/dev/null || return 1
@@ -109,7 +110,7 @@ verify_runtime() {
 
 if "$check_only"; then
     (("${#missing[@]}" == 0)) || exit 1
-    verify_runtime || fail 'ROS package discovery or Gazebo Harmonic version check failed.'
+    verify_runtime || fail 'ROS package discovery, ros2 control CLI, or Gazebo Harmonic version check failed.'
     [[ -f /etc/ros/rosdep/sources.list.d/20-default.list ]] ||
         fail 'rosdep has not been initialized. Run setup without --check.'
     rosdep check --from-paths "$workspace/src" --ignore-src --rosdistro jazzy ||
@@ -169,7 +170,7 @@ if (("${#missing[@]}")); then
     install_missing "${packages[@]}"
 fi
 
-verify_runtime || fail 'ROS package discovery or Gazebo Harmonic version check failed.'
+verify_runtime || fail 'ROS package discovery, ros2 control CLI, or Gazebo Harmonic version check failed.'
 if [[ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]]; then
     sudo rosdep init
 fi
