@@ -24,27 +24,35 @@ If dependency setup takes longer, finish that stage first. Move through the comp
 
 ### Install and build
 
-These commands assume Ubuntu 24.04 and an existing ROS 2 Jazzy installation. Clone this repository and enter its robotics_lab directory. Run the commands below from that directory.
+Use Ubuntu 24.04 on amd64 or arm64. The script can install ROS 2 Jazzy on a fresh Ubuntu machine.
 
 ```bash
-lsb_release -ds
-source /opt/ros/jazzy/setup.bash
-echo "$ROS_DISTRO"
-gz sim --versions
-sudo apt update
-sudo apt install python3-colcon-common-extensions python3-rosdep \
-  ros-jazzy-ros-gz ros-jazzy-gz-ros2-control \
-  ros-jazzy-ros2-controllers ros-jazzy-robot-state-publisher \
-  ros-jazzy-tf2-ros ros-jazzy-rviz2
+git clone https://github.com/huzaifazahid888/6DOF_fyp.git ~/6DOF_fyp
 cd ~/6DOF_fyp/robotics_lab
-rosdep update
-rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy
-colcon build --symlink-install
+bash scripts/setup_ubuntu.sh --yes --build
+source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 launch pieas_arm_description lab.launch.py
 ```
 
-If rosdep reports that it has never been initialized, run sudo rosdep init once and repeat rosdep update. Run each command after the previous command succeeds.
+For an existing clone, enter its robotics_lab directory and run `git pull --ff-only` before setup. The script locates the workspace from its own location, so the repository can live elsewhere too. Substitute that workspace path in the terminal commands below.
+
+| Option | Behavior |
+| --- | --- |
+| No options | Install missing prerequisites with package-manager prompts |
+| --check | Inspect installed packages, Gazebo version, and cached rosdep dependencies without downloads or sudo |
+| --yes | Accept installation prompts |
+| --build | Build the workspace after dependencies pass |
+| --with-moveit | Also install MoveIt and its Setup Assistant |
+| --help | Show usage |
+
+Run as your regular user. Internet access and sudo are needed when installing missing software. Repeat runs skip installed apt packages and refresh rosdep's dependency index. The script configures the official ROS apt source only when Jazzy packages are unavailable, enables Ubuntu Universe as needed during installation, and uses the ROS-packaged Harmonic libraries.
+
+The script sets a UTF-8 locale for its process. It prints environment commands for your terminal. With --check, a missing package or failed prerequisite check returns a nonzero exit status.
+
+If apt fails, inspect the reported package conflict or repository error, correct it, and rerun. Ubuntu's Noble updates repositories may be needed to satisfy dependencies. If graphics fail after setup, inspect your GPU/VM rendering configuration separately.
+
+Validation of the script includes Bash syntax, mocked install and repeat-run paths, read-only mode, dependency failures, and unsupported-system rejection. Installation on a fresh Ubuntu 24.04 machine and Gazebo GUI execution remain to be tested.
 
 ### Check before sending a motion
 

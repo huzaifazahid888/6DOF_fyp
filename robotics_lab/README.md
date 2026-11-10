@@ -20,16 +20,21 @@ The preview is an offline mesh rendering. Gazebo runtime validation is the next 
 
 ## Get started
 
-Target environment is Ubuntu 24.04, ROS 2 Jazzy, and Gazebo Harmonic.
-
-Clone the repository and enter this workspace:
+Target environment is Ubuntu 24.04 on amd64 or arm64, with ROS 2 Jazzy and Gazebo Harmonic.
 
 ```bash
-git clone https://github.com/huzaifazahid888/6DOF_fyp.git
-cd 6DOF_fyp/robotics_lab
+git clone https://github.com/huzaifazahid888/6DOF_fyp.git ~/6DOF_fyp
+cd ~/6DOF_fyp/robotics_lab
+bash scripts/setup_ubuntu.sh --yes --build
 ```
 
-Follow [START_HERE.md](START_HERE.md) for dependencies, build commands, first motion, sensor checks, troubleshooting, and the full experimental roadmap.
+For an existing clone, run `git pull --ff-only` before running the setup script. Run setup as your normal user. It requests sudo for system package installation, configures the official ROS repository if needed, installs missing prerequisites, resolves workspace dependencies, and optionally builds the workspace.
+
+To inspect prerequisites without making changes, run `bash scripts/setup_ubuntu.sh --check`. Add `--with-moveit` when starting the planning stages. Run `--help` for all options.
+
+Setup prints the source and launch commands to run in your current terminal. A successful prerequisite check still requires a Gazebo launch test to verify rendering, physics, and sensors.
+
+Follow [START_HERE.md](START_HERE.md) for the first motion, sensor checks, troubleshooting, and the full experimental roadmap.
 
 ## Project files
 
