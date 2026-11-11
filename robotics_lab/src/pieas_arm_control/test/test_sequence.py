@@ -44,11 +44,14 @@ def test_all_segments_fit_model_limits_and_exercise_every_joint():
     assert previous_pose == (0.0,) * 6
 
 
-def test_individual_stages_isolate_joints_and_coordinated_stage_moves_all():
-    for index in range(6):
-        group = WAYPOINTS[index * 4:index * 4 + 4]
-        assert group[0][1] == group[1][1]
-        assert [i for i, q in enumerate(group[0][1]) if q != 0] == [index]
-        assert group[2][1] == group[3][1] == (0.0,) * 6
-    assert all(q != 0 for q in WAYPOINTS[24][1])
-    assert WAYPOINTS[24][1][0] > 0 and WAYPOINTS[26][1][0] < 0
+def test_full_configured_range_and_thirty_second_finish():
+    from pieas_arm_control.sequence import UPPER, LOWER, HOME, DURATION
+    assert DURATION == 30
+    assert WAYPOINTS[1][1] == UPPER
+    assert WAYPOINTS[5][1] == LOWER
+    assert WAYPOINTS[3][1] == WAYPOINTS[-1][1] == HOME
+    previous = HOME
+    for _, pose, _ in WAYPOINTS:
+        # Avoid ambiguous +/-pi steps for the continuous wrist joint.
+        assert abs(pose[5] - previous[5]) < math.pi
+        previous = pose

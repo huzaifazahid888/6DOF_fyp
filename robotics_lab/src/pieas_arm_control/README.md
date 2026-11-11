@@ -1,89 +1,79 @@
-# Six-joint simulation demonstration
+# Thirty-second configured-range simulation test
 
-This package sends one `FollowJointTrajectory` action goal to the existing
-`arm_controller`. The controller executes it in Gazebo and returns feedback.
-The same `joint_sequence` executable now exercises all six joints.
+The `joint_sequence` action client now commands all six joints simultaneously.
+This replaces the longer individual-joint demonstration.
 
-## Run
+| Simulation time | Target |
+|---|---|
+| 0 s | Start at zero/home |
+| 4 s | Halfway to upper targets |
+| 8 s | Rail +0.5 m; rotary joints +180 degrees |
+| 11 s | Halfway back |
+| 15 s | Home |
+| 19 s | Halfway to lower targets |
+| 22 s | Rail -0.5 m; rotary joints -180 degrees |
+| 26 s | Halfway back |
+| 30 s | Home |
 
-Start the lab normally, leave Gazebo running and the robot at its zero/home pose.
-In another sourced terminal:
+Joint 6 is continuous: +/-180 degrees are chosen demonstration targets, not
+its maximum limits. The tool follows the arm. Gripper fingers remain fixed.
+The trajectory uses joint coordinates, not a straight Cartesian tool path.
+
+## Changed simulation speeds
+
+Both description URDF files now use 0.15 m/s for the rail and 1.0 rad/s
+(about 57.3 degrees/s) for every rotary joint. Effort limits are unchanged.
+These speeds are simulation assumptions, not measured actuator capabilities.
+The largest planned rest-to-rest cubic peak speeds are 0.125 m/s and about
+0.7854 rad/s, below the new limits. Each waypoint has zero endpoint velocity.
+
+The configured position limits have not been mechanically validated. In
+particular, +/-0.5 m rail travel may exceed the visible rail geometry, and
+large arm rotations can contact the base or other links. This is a range test,
+not a validated collision-free demonstration. Do not disable collisions to
+interpret a completed sweep as proof of real reachability.
+
+## Pull, build and run
+
+Stop the running lab before rebuilding, then:
 
 ```bash
-cd ~/6DOF_fyp/robotics_lab
+cd ~/6DOF_fyp
+git pull --ff-only
+cd robotics_lab
 source /opt/ros/jazzy/setup.bash
-colcon build --symlink-install --packages-select pieas_arm_control
+colcon build --symlink-install --packages-select pieas_arm_description pieas_arm_control
 source install/setup.bash
+```
+
+Restart the lab with your normal launch command so Gazebo loads the changed
+URDF speed limits. In another terminal, with Gazebo running and the arm home:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/6DOF_fyp/robotics_lab/install/setup.bash
 ros2 run pieas_arm_control joint_sequence --ros-args -p use_sim_time:=true
 ```
 
-The demonstration takes **176 simulation seconds**. A slower simulation takes
-longer in real time. The node prints each stage and target/actual/error for all
-six joints. Joint 1 is measured in metres; joints 2–6 are measured in radians.
+Thirty seconds means simulation time; real elapsed time depends on simulation
+speed. Allow up to three additional simulation seconds for final settling.
+The client has a 180-second wall-time timeout for paused or slow simulation.
 
-## What moves and why
+## Understand and observe
 
-The first 120 seconds test each joint separately, returning home between tests.
-Each test has 8 seconds outward motion, 2 seconds holding, 8 seconds returning,
-and 2 seconds holding at home. This makes each axis easy to identify.
+`sequence.py` defines absolute positions and cumulative arrival times.
+`joint_sequence.py` creates the ROS action client, checks fresh feedback and
+home, sends the trajectory, prints each stage and target/actual/error for all
+joints, and checks the controller result. Both files contain explanatory comments.
 
-| Joint | Test displacement | Unit |
-|---|---:|---|
-| joint_1 (rail) | +0.02 | metres (20 mm) |
-| joint_2 | +0.10 | radians |
-| joint_3 | -0.10 | radians |
-| joint_4 | -0.10 | radians |
-| joint_5 | -0.10 | radians |
-| joint_6 | +0.15 | radians |
+Path position-error tolerances are 0.03 m for the rail and 0.15 rad for rotary
+joints. Excessive tracking error aborts the goal instead of continuing the
+remaining sweep. These tolerances are not a collision detector. Final tolerances
+remain 0.002 m and 0.01 rad. If it aborts, inspect the feedback and contact before
+changing tolerances. Ctrl+C requests cancellation; pause Gazebo if cancellation
+is not confirmed. Restore home before rerunning; do not reset during a goal.
 
-The remaining 56 seconds move all joints together between two arm poses while
-the rail moves between +20 mm and -20 mm, then return to zero/home. The tool tip
-moves with the links; these are joint-space trajectories, not a prescribed
-Cartesian line. The RG2 fingers remain rigid because the model does not yet
-provide independently controlled finger joints.
-
-These small excursions do not represent full mechanical travel. The converted
-model still needs collision and physical-limit validation before larger motions.
-This demo does not run a collision planner. Observe the first run in Gazebo.
-
-## Understand the code
-
-`joint_sequence.py` is the ROS action client. Its comments explain the execution
-order: `main()` creates the node, `__init__()` establishes communications, and
-`run()` checks feedback and home, builds and sends a goal, then waits for its
-result. A goal being accepted is different from successful execution.
-
-`sequence.py` is plain Python data and helpers. `build_waypoints()` converts
-segment durations into cumulative arrival times. Each waypoint contains all six
-absolute positions and a stage description. Changing this file changes the
-experiment; it does not add a new ROS controller.
-
-`make_goal()` gives every waypoint zero endpoint velocity. The controller can
-therefore interpolate a smooth rest-to-rest cubic segment between positions.
-Repeated positions with a later timestamp create a hold. All six joints share
-the waypoint time, so they arrive together even when they travel different distances.
-This is trajectory execution with manually chosen waypoints, not automatic path planning.
-
-Feedback prints desired minus actual position. Final success checks the action
-status and controller result, with final position tolerances of 2 mm for the
-rail and 0.01 rad for rotary joints. Final success alone does not certify every
-intermediate position or collision clearance.
-
-## Starting, stopping and failures
-
-The client requires fresh advancing joint feedback, finite values, and all joints
-near home and stopped. It refuses to start otherwise; it does not automatically
-move an unknown pose home. Ctrl+C requests cancellation of this goal and waits
-briefly for confirmation. Cancellation does not return home. If cancellation is
-not confirmed, pause Gazebo. Do not reset the world during an active goal.
-
-There is a wall-time timeout of five times the planned duration plus 30 seconds.
-It remains effective when Gazebo is paused. After interruption, restore a valid
-home state before rerunning.
-
-## Validation
-
-`test/test_sequence.py` checks feedback validation, individual-joint isolation,
-coverage of all six joints, final home, and cubic peak speeds against the URDF
-velocity limits. These are offline checks, not evidence of a completed Gazebo run.
-Run with `colcon test --packages-select pieas_arm_control` in the ROS workspace.
+Offline tests check feedback validation, finite positions, URDF position and
+cubic peak velocity limits, both extreme targets, wrist segment direction, and
+final home at 30 seconds. Gazebo execution and collision clearance still require
+observation on the simulation machine.

@@ -125,8 +125,10 @@ class JointSequence(Node):
             # The conditional expression chooses the tolerance using the joint index.
             goal.goal_tolerance.append(JointTolerance(name=name, position=0.002 if index == 0 else 0.01))
         # Permit up to three extra simulation seconds to meet the final goal criteria.
-        # No custom path tolerances are added here: endpoint success alone does not
-        # certify accurate tracking throughout the entire movement.
+        # Abort if tracking error becomes large during the range test. This can
+        # detect stalled tracking, but does not replace collision checking.
+        for index, name in enumerate(JOINTS):
+            goal.path_tolerance.append(JointTolerance(name=name, position=0.03 if index == 0 else 0.15))
         goal.goal_time_tolerance = Duration(sec=3)
         # The default zero trajectory header timestamp requests an immediate start
         # when the controller receives it. Return the message to run().
@@ -185,7 +187,7 @@ class JointSequence(Node):
         reason = home_error(self.state.name, self.state.position, self.state.velocity)
         if reason:
             raise RuntimeError(reason + ' Return home before starting this lesson.')
-        self.get_logger().info(f'Sending six individual joint tests, coordinated rail/arm motion, then home ({DURATION} simulation seconds).')
+        self.get_logger().info(f'Sending simultaneous upper-limit sweep, home, lower-limit sweep, then home ({DURATION} simulation seconds).')
         # make_goal() runs now and returns the request. send_goal_async sends it.
         # The callback argument registers feedback(); the returned future is for
         # ACCEPTANCE, not for the whole demonstration.

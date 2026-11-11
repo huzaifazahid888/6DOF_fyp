@@ -1,52 +1,28 @@
-"""Small-range six-joint demonstration. No ROS communication in this file."""
+"""Thirty-second configured-range simulation test, not a collision planner."""
 import math
 
-# Array order is always rail first (metres), then five angles (radians).
+# The rail uses metres. All other coordinates use radians.
 JOINTS = tuple(f'joint_{i}' for i in range(1, 7))
 HOME = (0.0,) * 6
+# These match the bounded joints in the URDF. Joint 6 is continuous, so its
+# +/-pi targets are chosen test angles, not physical end stops.
+UPPER = (0.5, 3.14159265359, 3.14159265359, 3.14159265359, 3.14159265359, math.pi)
+LOWER = tuple(-q for q in UPPER)
 
-
-def build_waypoints():
-    """Return (arrival seconds, six absolute positions, stage description)."""
-    points = []
-    elapsed = 0
-
-    def add(duration, positions, label):
-        # Convert a segment duration into time from the beginning of the goal.
-        nonlocal elapsed
-        elapsed += duration
-        points.append((elapsed, tuple(positions), label))
-
-    # Isolate each joint so its axis and effect on the tool are easy to observe.
-    # Negative flexion angles lift the links in this model's home configuration.
-    # These are demonstration distances, NOT the mechanical travel limits.
-    excursions = (0.02, 0.10, -0.10, -0.10, -0.10, 0.15)
-    for index, excursion in enumerate(excursions):
-        pose = list(HOME)
-        pose[index] = excursion
-        label = f'{JOINTS[index]} only'
-        add(8, pose, label + ': move out')
-        add(2, pose, label + ': hold')
-        add(8, HOME, label + ': return home')
-        add(2, HOME, label + ': home hold')
-
-    # Coordinated motion: all six coordinates change in the same time segment.
-    # The controller interpolates JOINT coordinates. This is not a straight-line
-    # tool-tip command, inverse kinematics, or collision-aware motion planning.
-    pose_a = (0.02, 0.10, -0.10, -0.08, -0.05, 0.15)
-    pose_b = (-0.02, -0.10, -0.06, -0.12, -0.08, -0.15)
-    add(12, pose_a, 'coordinated: lift and move along rail')
-    add(2, pose_a, 'coordinated: hold pose A')
-    add(12, pose_b, 'coordinated: reverse rail and change arm pose')
-    add(2, pose_b, 'coordinated: hold pose B')
-    add(12, pose_a, 'coordinated: return to pose A')
-    add(2, pose_a, 'coordinated: hold pose A again')
-    add(12, HOME, 'all joints: return home')
-    add(2, HOME, 'all joints: final home hold')
-    return tuple(points)
-
-
-WAYPOINTS = build_waypoints()
+# Each row is (arrival seconds, absolute joint coordinates, stage label).
+# Halfway points keep continuous-joint segments below pi so the commanded
+# direction is unambiguous. Zero endpoint velocities make each segment stop.
+# All joints move together; testing them separately would take longer.
+WAYPOINTS = (
+    (4, tuple(q / 2 for q in UPPER), 'upper sweep: halfway'),
+    (8, UPPER, 'upper sweep: configured limits'),
+    (11, tuple(q / 2 for q in UPPER), 'return from upper: halfway'),
+    (15, HOME, 'return from upper: home'),
+    (19, tuple(q / 2 for q in LOWER), 'lower sweep: halfway'),
+    (22, LOWER, 'lower sweep: configured limits'),
+    (26, tuple(q / 2 for q in LOWER), 'return from lower: halfway'),
+    (30, HOME, 'return from lower: home'),
+)
 DURATION = WAYPOINTS[-1][0]
 
 
