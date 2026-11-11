@@ -1,3 +1,7 @@
+> RETIRED: the direct full-range sweep produced link penetration. The executable
+> now refuses motion. Use [the MoveIt milestone](../pieas_arm_moveit_config/README.md).
+> The original explanation below is retained as history, not current run instructions.
+
 # Thirty-second configured-range simulation test
 
 The `joint_sequence` action client now commands all six joints simultaneously.

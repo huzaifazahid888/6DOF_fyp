@@ -49,6 +49,13 @@ def prepare_world(package):
                    for plugin in model.findall('plugin')):
             raise RuntimeError('URDF conversion lost the Gazebo control plugin.')
         model.set('name', 'pieas_arm')
+        # Non-adjacent robot links must participate in Gazebo contact physics.
+        # Directly joint-connected links are excluded by SDFormat semantics.
+        for entity in [model] + model.findall('link'):
+            flag = entity.find('self_collide')
+            if flag is None:
+                flag = ET.SubElement(entity, 'self_collide')
+            flag.text = 'true'
         world_tree = ET.parse(package / 'worlds/lab.sdf')
         world = world_tree.getroot().find('world')
         if world is None or world.get('name') != 'lab':

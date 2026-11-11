@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Initialize the scene, check measured state, and request a small MoveIt plan.
+
+Default: preview only. Set execute:=true to plan afresh and execute that plan.
+This is a MoveGroup client; it does not send raw waypoints to arm_controller.
+"""
+import time
+import math
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.signals import SignalHandlerOptions
+from action_msgs.msg import GoalStatus
+from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Pose
+from shape_msgs.msg import Plane
+from moveit_msgs.msg import (CollisionObject, PlanningScene, PlanningSceneComponents,
+                             AllowedCollisionEntry, Constraints, JointConstraint,
+                             MoveItErrorCodes)
+from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
+from moveit_msgs.action import MoveGroup
+
+JOINTS = [f'joint_{i}' for i in range(1, 7)]
+
+
+class Planner(Node):
+    def __init__(self):
+        super().__init__('pieas_plan_joint_goal')
+        self.declare_parameter('execute', False)
+        self.declare_parameter('setup_only', False)
+        self.declare_parameter('target', [0.01, 0.10, -0.10, -0.08, -0.05, 0.10])
+        self.state = None
+        self.received = 0.0
+        self.advancing = False
+        self.goal_future = None
+        self.handle = None
+        self.result_future = None
+        self.subscription = self.create_subscription(
+            JointState, '/joint_states', self.receive, qos_profile_sensor_data)
+        self.client = ActionClient(self, MoveGroup, '/move_action')
+
+    def receive(self, message):
+        def stamp(s):
+            return s.header.stamp.sec * 1000000000 + s.header.stamp.nanosec
+        self.advancing = self.state is not None and stamp(message) > stamp(self.state)
+        self.state = message
+        self.received = time.monotonic()
+
+    def wait(self, future, seconds=30):
+        # Wall time keeps a paused simulation from causing an endless wait.
+        deadline = time.monotonic() + seconds
+        while rclpy.ok() and not future.done() and time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        if not future.done():
+            raise RuntimeError('Timed out waiting for MoveIt. Check launch output and Gazebo clock.')
+        return future.result()
+
+    def service(self, kind, name, request):
+        client = self.create_client(kind, name)
+        try:
+            if not client.wait_for_service(timeout_sec=60):
+                raise RuntimeError(f'Service unavailable: {name}')
+            return self.wait(client.call_async(request))
+        finally:
+            self.destroy_client(client)
+
+    def setup_scene(self):
+        # Gazebo obstacles do not automatically appear in MoveIt's planning scene.
+        # Reproduce the lab's z=0 ground plane; the base is fixed to that ground.
+        query = GetPlanningScene.Request()
+        query.components.components = PlanningSceneComponents.ALLOWED_COLLISION_MATRIX
+        current = self.service(GetPlanningScene, '/get_planning_scene', query)
+        matrix = current.scene.allowed_collision_matrix
+        # Preserve all SRDF exclusions; add only the fixed base-to-ground contact.
+        for name in ['lab_ground', 'base_link']:
+            if name not in matrix.entry_names:
+                for row in matrix.entry_values:
+                    row.enabled.append(False)
+                matrix.entry_names.append(name)
+                matrix.entry_values.append(AllowedCollisionEntry(
+                    enabled=[False] * len(matrix.entry_names)))
+        a, b = matrix.entry_names.index('lab_ground'), matrix.entry_names.index('base_link')
+        matrix.entry_values[a].enabled[b] = True
+        matrix.entry_values[b].enabled[a] = True
+        ground = CollisionObject()
+        ground.id = 'lab_ground'
+        ground.header.frame_id = 'world'
+        ground.operation = CollisionObject.ADD
+        ground.planes = [Plane(coef=[0.0, 0.0, 1.0, 0.0])]
+        pose = Pose()
+        pose.orientation.w = 1.0
+        ground.plane_poses = [pose]
+        scene = PlanningScene()
+        scene.is_diff = True
+        scene.robot_state.is_diff = True
+        scene.allowed_collision_matrix = matrix
+        scene.world.collision_objects = [ground]
+        response = self.service(ApplyPlanningScene, '/apply_planning_scene',
+                                ApplyPlanningScene.Request(scene=scene))
+        if not response.success:
+            raise RuntimeError('MoveIt rejected the ground planning-scene update.')
+        self.get_logger().info('Planning scene ready: ground added; robot self-collision checks retained.')
+
+    def check_measured_state(self):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if self.advancing and time.monotonic() - self.received < 1.0:
+                break
+        else:
+            raise RuntimeError('No advancing joint feedback. Resume Gazebo and check controllers.')
+        s = self.state
+        if len(s.name) != len(s.position) or len(s.name) != len(s.velocity):
+            raise RuntimeError('Incomplete joint feedback.')
+        if len(set(s.name)) != len(s.name):
+            raise RuntimeError('Duplicate joint names in feedback.')
+        values = dict(zip(s.name, zip(s.position, s.velocity)))
+        for i, name in enumerate(JOINTS):
+            if name not in values or not all(math.isfinite(x) for x in values[name]):
+                raise RuntimeError(f'Missing or invalid feedback: {name}')
+            if abs(values[name][1]) > (0.002 if i == 0 else 0.01):
+                raise RuntimeError(f'{name} is moving. Stop other motion clients before planning.')
+        request = GetStateValidity.Request()
+        request.group_name = 'arm'
+        request.robot_state.joint_state = s
+        request.robot_state.is_diff = True
+        response = self.service(GetStateValidity, '/check_state_validity', request)
+        if not response.valid:
+            pairs = sorted({f'{c.contact_body_1} <-> {c.contact_body_2}' for c in response.contacts})
+            raise RuntimeError('Current state is invalid. Contacts: ' +
+                               (', '.join(pairs) or 'none reported; inspect joint bounds and MoveIt log.'))
+        self.get_logger().info('Measured state passed MoveIt collision/state validity check.')
+
+    def run(self):
+        self.setup_scene()
+        if self.get_parameter('setup_only').value:
+            return
+        self.check_measured_state()
+        targets = self.get_parameter('target').value
+        if len(targets) != 6 or not all(math.isfinite(x) for x in targets):
+            raise RuntimeError('target must contain six finite values: rail metres, then five radians.')
+        # Limit this first lesson's targets. These are operating restrictions,
+        # not assertions about the physical robot's mechanical end stops.
+        if abs(targets[0]) > 0.02 or any(abs(x) > 0.3 for x in targets[1:]):
+            raise RuntimeError('First-lesson target bounds: rail +/-0.02 m, angles +/-0.3 rad.')
+        if not self.client.wait_for_server(timeout_sec=30):
+            raise RuntimeError('MoveGroup action server unavailable.')
+        goal = MoveGroup.Goal()
+        request = goal.request
+        request.group_name = 'arm'
+        request.pipeline_id = 'ompl'
+        request.planner_id = 'RRTConnectkConfigDefault'
+        request.allowed_planning_time = 10.0
+        request.num_planning_attempts = 3
+        request.max_velocity_scaling_factor = 0.1
+        request.max_acceleration_scaling_factor = 0.1
+        # Use the live monitored start state, not a hard-coded home state.
+        request.start_state.is_diff = True
+        request.workspace_parameters.header.frame_id = 'world'
+        request.workspace_parameters.min_corner.x = -2.0
+        request.workspace_parameters.min_corner.y = -2.0
+        request.workspace_parameters.min_corner.z = -1.0
+        request.workspace_parameters.max_corner.x = 2.0
+        request.workspace_parameters.max_corner.y = 2.0
+        request.workspace_parameters.max_corner.z = 2.0
+        constraint = Constraints(name='small_joint_goal')
+        for i, (name, position) in enumerate(zip(JOINTS, targets)):
+            tolerance = 0.001 if i == 0 else 0.005
+            constraint.joint_constraints.append(JointConstraint(
+                joint_name=name, position=position, tolerance_above=tolerance,
+                tolerance_below=tolerance, weight=1.0))
+        request.goal_constraints = [constraint]
+        execute = self.get_parameter('execute').value
+        goal.planning_options.plan_only = not execute
+        goal.planning_options.replan = False
+        self.get_logger().info('Planning and executing.' if execute else
+                               'Planning only: the Gazebo robot will not move.')
+        self.goal_future = self.client.send_goal_async(goal)
+        self.handle = self.wait(self.goal_future)
+        if not self.handle.accepted:
+            raise RuntimeError('MoveIt rejected the goal.')
+        self.result_future = self.handle.get_result_async()
+        response = self.wait(self.result_future, 180)
+        result = response.result
+        if response.status != GoalStatus.STATUS_SUCCEEDED or result.error_code.val != MoveItErrorCodes.SUCCESS:
+            raise RuntimeError(f'MoveIt failed: action={response.status}, code={result.error_code.val}. Inspect move_group log.')
+        points = result.planned_trajectory.joint_trajectory.points
+        if not points:
+            raise RuntimeError('MoveIt returned an empty trajectory.')
+        duration = points[-1].time_from_start
+        self.get_logger().info(f'Success: {len(points)} points, '
+                               f'{duration.sec + duration.nanosec * 1e-9:.2f} simulation seconds. '
+                               + ('Execution completed.' if execute else 'Preview the path in RViz.'))
+
+    def cancel(self):
+        # Handle late acceptance too, so Ctrl+C does not knowingly orphan a goal.
+        if self.handle is None and self.goal_future is not None:
+            self.handle = self.wait(self.goal_future, 3)
+        if self.handle is None or not self.handle.accepted:
+            return
+        if self.result_future is not None and self.result_future.done():
+            return
+        response = self.wait(self.handle.cancel_goal_async(), 3)
+        if not response.goals_canceling:
+            raise RuntimeError('Cancellation not acknowledged.')
+        if self.result_future is None:
+            self.result_future = self.handle.get_result_async()
+        self.wait(self.result_future, 3)
+
+
+def main():
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    node = Planner()
+    code = 0
+    try:
+        node.run()
+    except (Exception, KeyboardInterrupt) as error:
+        code = 1
+        node.get_logger().error(str(error) or 'Interrupted.')
+        try:
+            node.cancel()
+        except (Exception, KeyboardInterrupt) as cancel_error:
+            node.get_logger().error(f'Cancellation unconfirmed: {cancel_error}. Pause Gazebo.')
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+    return code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

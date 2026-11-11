@@ -1,0 +1,27 @@
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+Visualization Manager:
+  Class: ''
+  Global Options:
+    Fixed Frame: world
+  Displays:
+  - Class: rviz_default_plugins/Grid
+    Name: Grid
+    Enabled: true
+  - Class: moveit_rviz_plugin/MotionPlanning
+    Name: MotionPlanning
+    Enabled: true
+    Robot Description: robot_description
+    Planning Group: arm
+    Planning Scene Topic: /monitored_planning_scene
+    Planned Path:
+      Trajectory Topic: /display_planned_path
+      Robot Alpha: 0.5
+    Scene Robot:
+      Robot Alpha: 1.0
+    Scene Geometry:
+      Scene Alpha: 1.0
+Window Geometry:
+  Width: 1280
+  Height: 900

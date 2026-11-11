@@ -165,50 +165,12 @@ class JointSequence(Node):
                         f'error={desired - actual:.4f} {unit}')
         self.get_logger().info(f't={elapsed:.1f}/{DURATION}s | ' + ' | '.join(rows))
 
-    # Main experiment procedure, called once by main after node construction.
+    # Retain the original goal-building lesson above for reading, but do not
+    # run a sequence known to produce link penetration in the converted model.
     def run(self):
-        self.get_logger().info('Waiting for the trajectory action server...')
-        # Give ROS up to ten real seconds to discover the matching action server.
-        if not self.client.wait_for_server(timeout_sec=10.0):
-            raise RuntimeError('Action server unavailable. Start the lab and activate arm_controller.')
-        # Allow up to ten real seconds to receive advancing joint feedback.
-        deadline = time.monotonic() + 10.0
-        while time.monotonic() < deadline:
-            # Process a ready ROS callback, or wait up to 0.1 seconds for work.
-            # This allows incoming feedback and action responses to be handled.
-            rclpy.spin_once(self, timeout_sec=0.1)
-            # Require advancing message timestamps and a message received within one second.
-            if self.state_advancing and time.monotonic() - self.received_at < 1.0:
-                break
-        else:
-            raise RuntimeError('No advancing joint feedback. Resume Gazebo and check joint_state_broadcaster.')
-        # Call our helper in sequence.py. It returns None when checks pass,
-        # or an explanatory string when joints are missing, moving or away from home.
-        reason = home_error(self.state.name, self.state.position, self.state.velocity)
-        if reason:
-            raise RuntimeError(reason + ' Return home before starting this lesson.')
-        self.get_logger().info(f'Sending simultaneous upper-limit sweep, home, lower-limit sweep, then home ({DURATION} simulation seconds).')
-        # make_goal() runs now and returns the request. send_goal_async sends it.
-        # The callback argument registers feedback(); the returned future is for
-        # ACCEPTANCE, not for the whole demonstration.
-        self.goal_future = self.client.send_goal_async(self.make_goal(), feedback_callback=self.feedback)
-        # Process ROS events until acceptance/rejection arrives, or the timeout expires.
-        self.goal_handle = self.wait_for(self.goal_future, 10.0)
-        # A server can reject a goal. Do not treat sending as proof of acceptance.
-        if not self.goal_handle.accepted:
-            raise RuntimeError('Controller rejected the trajectory.')
-        self.get_logger().info('Goal accepted; waiting for execution to finish.')
-        # Ask for the final result of this specific accepted goal.
-        self.result_future = self.goal_handle.get_result_async()
-        # Allow slow simulation up to five times the planned duration plus 30 seconds.
-        # This wall-time bound still expires if simulation is left paused.
-        response = self.wait_for(self.result_future, DURATION * 5.0 + 30.0)
-        # The response contains action status plus the controller-specific result payload.
-        result = response.result
-        # Require both successful action status AND a successful controller result code.
-        if response.status != GoalStatus.STATUS_SUCCEEDED or result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:
-            raise RuntimeError(f'Trajectory failed: status={response.status}, code={result.error_code}, {result.error_string}')
-        self.get_logger().info('Trajectory succeeded. The final waypoint is home.')
+        raise RuntimeError(
+            'The full-range sequence is retired after observed link penetration. '
+            'Use pieas_arm_moveit_config plan_joint_goal for collision-checked planning.')
 
     # Cleanup path used after interruption or failure. Request cancellation of
     # our own goal only; cancellation is not a home movement or world reset.

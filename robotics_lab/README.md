@@ -1,3 +1,10 @@
+## Current milestone: MoveIt collision-aware planning
+
+The full-range direct trajectory demo is retired after observed link penetration.
+See [MoveIt setup and first experiment](src/pieas_arm_moveit_config/README.md).
+The integrated launch enables Gazebo self-collision and connects MoveIt to the
+existing controller. Start with state validation and plan-only preview.
+
 # PIEAS Arm Robotics Lab
 
 A ROS 2 and Gazebo learning and research project built around the six-DOF arm from my bachelor's project at PIEAS. The goal is to progress from controlled joint motion to perception, collision avoidance, and autonomous manipulation.
@@ -20,21 +27,16 @@ The preview is an offline mesh rendering. Gazebo runtime validation is the next 
 
 ## Get started
 
-Target environment is Ubuntu 24.04 on amd64 or arm64, with ROS 2 Jazzy and Gazebo Harmonic.
+Target environment is Ubuntu 24.04, ROS 2 Jazzy, and Gazebo Harmonic.
+
+Clone the repository and enter this workspace:
 
 ```bash
-git clone https://github.com/huzaifazahid888/6DOF_fyp.git ~/6DOF_fyp
-cd ~/6DOF_fyp/robotics_lab
-bash scripts/setup_ubuntu.sh --yes --build
+git clone https://github.com/huzaifazahid888/6DOF_fyp.git
+cd 6DOF_fyp/robotics_lab
 ```
 
-For an existing clone, run `git pull --ff-only` before running the setup script. Run setup as your normal user. It requests sudo for system package installation, configures the official ROS repository if needed, installs missing prerequisites, resolves workspace dependencies, and optionally builds the workspace.
-
-To inspect prerequisites without making changes, run `bash scripts/setup_ubuntu.sh --check`. Add `--with-moveit` when starting the planning stages. Run `--help` for all options.
-
-Setup prints the source and launch commands to run in your current terminal. A successful prerequisite check still requires a Gazebo launch test to verify rendering, physics, and sensors.
-
-Follow [START_HERE.md](START_HERE.md) for the first motion, sensor checks, troubleshooting, and the full experimental roadmap.
+Follow [START_HERE.md](START_HERE.md) for dependencies, build commands, first motion, sensor checks, troubleshooting, and the full experimental roadmap.
 
 ## Project files
 
