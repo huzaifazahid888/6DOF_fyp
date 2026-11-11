@@ -3,7 +3,7 @@
 # Motion values and the home check are imported from sequence.py.
 # No motion occurs just by importing this file.
 
-"""Send the previously tested 38-second joint-2 sequence once."""
+"""Run the six-joint simulation demonstration once."""
 # Python standard library. monotonic() measures elapsed real time.
 # We use it for timeouts so pausing Gazebo cannot freeze our timeout clock.
 import time
@@ -32,9 +32,9 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 # These are OUR definitions from sequence.py, not ROS library functions.
-# JOINTS gives the array order; WAYPOINTS gives (arrival time, joint-2 angle).
+# JOINTS gives the array order; WAYPOINTS gives (arrival time, six positions, stage label).
 # home_error checks whether starting this particular experiment is appropriate.
-from pieas_arm_control.sequence import JOINTS, WAYPOINTS, home_error
+from pieas_arm_control.sequence import JOINTS, WAYPOINTS, DURATION, home_error
 
 
 # Our class inherits from Node, so its objects have ROS node capabilities.
@@ -64,6 +64,7 @@ class JointSequence(Node):
         self.received_at = 0.0
         # Wall-clock time of our last progress print; limits terminal output.
         self.last_print = 0.0
+        self.last_stage = None
         # The accepted goal handle lets us request its result or cancel that specific goal.
         self.goal_handle = None
         # A future holds a response that will arrive later: here, acceptance or rejection.
@@ -101,15 +102,15 @@ class JointSequence(Node):
         goal = FollowJointTrajectory.Goal()
         # Array values below correspond to names in exactly this order.
         goal.trajectory.joint_names = list(JOINTS)
-        # Unpack each pair from sequence.py, for example (8, 0.1).
+        # Unpack a timestamp, full joint pose and human-readable stage label.
         # Arrival times are cumulative from trajectory start, not segment durations.
-        for seconds, angle in WAYPOINTS:
+        for seconds, positions, label in WAYPOINTS:
             # Create a fresh object each iteration. append stores an object reference;
             # reusing one object would cause list entries to refer to that same object.
             point = JointTrajectoryPoint()
-            # Only array index 1 (joint_2) changes. Indexing starts at zero.
+            # All six coordinates are supplied in the JOINTS order.
             # Joint 1 uses metres; rotary joints use radians. These are absolute coordinates.
-            point.positions = [0.0, angle, 0.0, 0.0, 0.0, 0.0]
+            point.positions = list(positions)
             # Python creates a list of six zeros. These are ENDPOINT velocities:
             # stop at the waypoint, not stay still for the whole segment.
             point.velocities = [0.0] * 6
@@ -134,24 +135,33 @@ class JointSequence(Node):
     # Action feedback callback, separate from our /joint_states subscription.
     # It receives progress for the goal we sent, including desired and actual states.
     def feedback(self, message):
-        # Print at most once per wall-clock second, even if feedback arrives much faster.
-        if time.monotonic() - self.last_print < 1.0:
+        feedback = message.feedback
+        elapsed = (feedback.desired.time_from_start.sec
+                   + feedback.desired.time_from_start.nanosec * 1e-9)
+        # A waypoint label describes the movement leading TO that waypoint.
+        stage = next((label for seconds, _, label in WAYPOINTS if elapsed < seconds),
+                     'finishing')
+        changed = stage != self.last_stage
+        if changed:
+            self.get_logger().info(f'Stage: {stage}')
+            self.last_stage = stage
+        # Print all joints every two real seconds, and immediately on stage changes.
+        if not changed and time.monotonic() - self.last_print < 2.0:
             return
         self.last_print = time.monotonic()
-        # The action wrapper contains the actual feedback payload in its feedback member.
-        feedback = message.feedback
-        if 'joint_2' not in feedback.joint_names:
-            return
-        # Look up joint 2 by name rather than assuming the server always orders it second.
-        index = feedback.joint_names.index('joint_2')
-        # Ignore an incomplete message instead of indexing beyond an array.
-        if min(len(feedback.desired.positions), len(feedback.actual.positions)) <= index:
-            return
-        desired = feedback.desired.positions[index]
-        actual = feedback.actual.positions[index]
-        # An f-string inserts variables; :.4f prints four decimal places.
-        # Error is desired minus actual. Printed zero can hide a smaller nonzero error.
-        self.get_logger().info(f'joint_2: target={desired:.4f}, actual={actual:.4f}, error={desired - actual:.4f} rad')
+        rows = []
+        for number, name in enumerate(JOINTS):
+            if name not in feedback.joint_names:
+                continue
+            index = feedback.joint_names.index(name)
+            if min(len(feedback.desired.positions), len(feedback.actual.positions)) <= index:
+                continue
+            desired = feedback.desired.positions[index]
+            actual = feedback.actual.positions[index]
+            unit = 'm' if number == 0 else 'rad'
+            rows.append(f'{name}: target={desired:.4f}, actual={actual:.4f}, '
+                        f'error={desired - actual:.4f} {unit}')
+        self.get_logger().info(f't={elapsed:.1f}/{DURATION}s | ' + ' | '.join(rows))
 
     # Main experiment procedure, called once by main after node construction.
     def run(self):
@@ -175,10 +185,10 @@ class JointSequence(Node):
         reason = home_error(self.state.name, self.state.position, self.state.velocity)
         if reason:
             raise RuntimeError(reason + ' Return home before starting this lesson.')
-        self.get_logger().info('Sending: +0.1 rad, hold, -0.1 rad, hold, home (38 simulation seconds).')
+        self.get_logger().info(f'Sending six individual joint tests, coordinated rail/arm motion, then home ({DURATION} simulation seconds).')
         # make_goal() runs now and returns the request. send_goal_async sends it.
         # The callback argument registers feedback(); the returned future is for
-        # ACCEPTANCE, not for the whole 38-second movement.
+        # ACCEPTANCE, not for the whole demonstration.
         self.goal_future = self.client.send_goal_async(self.make_goal(), feedback_callback=self.feedback)
         # Process ROS events until acceptance/rejection arrives, or the timeout expires.
         self.goal_handle = self.wait_for(self.goal_future, 10.0)
@@ -188,9 +198,9 @@ class JointSequence(Node):
         self.get_logger().info('Goal accepted; waiting for execution to finish.')
         # Ask for the final result of this specific accepted goal.
         self.result_future = self.goal_handle.get_result_async()
-        # Keep processing feedback while awaiting completion. This is a 180-second
-        # wall-time limit; the trajectory itself takes 38 seconds of simulation time.
-        response = self.wait_for(self.result_future, 180.0)
+        # Allow slow simulation up to five times the planned duration plus 30 seconds.
+        # This wall-time bound still expires if simulation is left paused.
+        response = self.wait_for(self.result_future, DURATION * 5.0 + 30.0)
         # The response contains action status plus the controller-specific result payload.
         result = response.result
         # Require both successful action status AND a successful controller result code.

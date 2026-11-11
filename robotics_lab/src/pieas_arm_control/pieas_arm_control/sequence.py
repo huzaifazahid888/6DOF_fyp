@@ -1,19 +1,53 @@
-# This file contains experiment data and a helper, with no ROS communication.
-# Editing WAYPOINTS changes the requested sequence. It does not move the robot
-# until joint_sequence.py is run again. It currently varies joint_2 only.
-
-"""The joint-2 experiment, expressed without ROS-specific message classes."""
-# Python standard library; isfinite rejects NaN and positive/negative infinity.
+"""Small-range six-joint demonstration. No ROS communication in this file."""
 import math
 
-# range(1, 7) produces 1 through 6. Each f-string builds a joint name.
-# A tuple is an immutable sequence. This order defines the outgoing arrays.
+# Array order is always rail first (metres), then five angles (radians).
 JOINTS = tuple(f'joint_{i}' for i in range(1, 7))
-# Each pair is (seconds from start, target angle of joint_2 in radians).
-# 8: reach +0.1; 11: finish hold; 27: reach -0.1; 30: finish hold; 38: home.
-# These are cumulative times, not durations to add together.
-# joint_sequence.py fills the other five target coordinates with zero.
-WAYPOINTS = ((8, 0.1), (11, 0.1), (27, -0.1), (30, -0.1), (38, 0.0))
+HOME = (0.0,) * 6
+
+
+def build_waypoints():
+    """Return (arrival seconds, six absolute positions, stage description)."""
+    points = []
+    elapsed = 0
+
+    def add(duration, positions, label):
+        # Convert a segment duration into time from the beginning of the goal.
+        nonlocal elapsed
+        elapsed += duration
+        points.append((elapsed, tuple(positions), label))
+
+    # Isolate each joint so its axis and effect on the tool are easy to observe.
+    # Negative flexion angles lift the links in this model's home configuration.
+    # These are demonstration distances, NOT the mechanical travel limits.
+    excursions = (0.02, 0.10, -0.10, -0.10, -0.10, 0.15)
+    for index, excursion in enumerate(excursions):
+        pose = list(HOME)
+        pose[index] = excursion
+        label = f'{JOINTS[index]} only'
+        add(8, pose, label + ': move out')
+        add(2, pose, label + ': hold')
+        add(8, HOME, label + ': return home')
+        add(2, HOME, label + ': home hold')
+
+    # Coordinated motion: all six coordinates change in the same time segment.
+    # The controller interpolates JOINT coordinates. This is not a straight-line
+    # tool-tip command, inverse kinematics, or collision-aware motion planning.
+    pose_a = (0.02, 0.10, -0.10, -0.08, -0.05, 0.15)
+    pose_b = (-0.02, -0.10, -0.06, -0.12, -0.08, -0.15)
+    add(12, pose_a, 'coordinated: lift and move along rail')
+    add(2, pose_a, 'coordinated: hold pose A')
+    add(12, pose_b, 'coordinated: reverse rail and change arm pose')
+    add(2, pose_b, 'coordinated: hold pose B')
+    add(12, pose_a, 'coordinated: return to pose A')
+    add(2, pose_a, 'coordinated: hold pose A again')
+    add(12, HOME, 'all joints: return home')
+    add(2, HOME, 'all joints: final home hold')
+    return tuple(points)
+
+
+WAYPOINTS = build_waypoints()
+DURATION = WAYPOINTS[-1][0]
 
 
 # Our own helper, called by JointSequence.run before sending any motion.

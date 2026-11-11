@@ -1,167 +1,89 @@
-# Lesson 1: program the tested joint-2 sequence
+# Six-joint simulation demonstration
 
-This package sends the same trajectory already tested through the terminal:
-+0.1 rad at 8 s, hold until 11 s, -0.1 rad at 27 s, hold until 30 s,
-and zero at 38 s. Only joint 2 changes its target. It is a simulation lesson,
-not a collision-checked planner or a hardware-ready control system.
+This package sends one `FollowJointTrajectory` action goal to the existing
+`arm_controller`. The controller executes it in Gazebo and returns feedback.
+The same `joint_sequence` executable now exercises all six joints.
 
-## Get and build
+## Run
 
-From the repository root, use `git pull --ff-only`. If Git reports conflicting
-local edits, inspect them; do not discard them to force an update.
+Start the lab normally, leave Gazebo running and the robot at its zero/home pose.
+In another sourced terminal:
 
 ```bash
 cd ~/6DOF_fyp/robotics_lab
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-select pieas_arm_control
 source install/setup.bash
-```
-
-Keep the existing Gazebo lab launch running in another terminal. If it is not
-running, start `ros2 launch pieas_arm_description lab.launch.py` separately.
-Resume simulation and start from home with no other motion sender active.
-The following command sends a motion goal immediately after its checks pass:
-
-```bash
 ros2 run pieas_arm_control joint_sequence --ros-args -p use_sim_time:=true
 ```
 
-It runs once and exits. Do not press world Reset while it executes. Ctrl+C
-requests cancellation of this client's goal; it does not reset or return home.
-If cancellation cannot be confirmed, pause Gazebo. The client waits at most
-180 wall-clock seconds for execution, even though the trajectory is 38 seconds
-of simulation time. A very slow or paused simulation can hit that timeout.
+The demonstration takes **176 simulation seconds**. A slower simulation takes
+longer in real time. The node prints each stage and target/actual/error for all
+six joints. Joint 1 is measured in metres; joints 2–6 are measured in radians.
 
-## Files and responsibilities
+## What moves and why
 
-- `package.xml`: ROS dependencies and package metadata.
-- `setup.py`: Python installation and the `joint_sequence` executable entry point.
-- `setup.cfg`: puts the executable where `ros2 run` searches.
-- `resource/pieas_arm_control`: marker used by the ROS package index.
-- `pieas_arm_control/__init__.py`: identifies the Python package.
-- `sequence.py`: joint order, waypoint values and a home-state check.
-- `joint_sequence.py`: ROS node, messages, action communication and feedback.
+The first 120 seconds test each joint separately, returning home between tests.
+Each test has 8 seconds outward motion, 2 seconds holding, 8 seconds returning,
+and 2 seconds holding at home. This makes each axis easy to identify.
 
-## Read the program in execution order
+| Joint | Test displacement | Unit |
+|---|---:|---|
+| joint_1 (rail) | +0.02 | metres (20 mm) |
+| joint_2 | +0.10 | radians |
+| joint_3 | -0.10 | radians |
+| joint_4 | -0.10 | radians |
+| joint_5 | -0.10 | radians |
+| joint_6 | +0.15 | radians |
 
-### 1. Imports: where the types come from
+The remaining 56 seconds move all joints together between two arm poses while
+the rail moves between +20 mm and -20 mm, then return to zero/home. The tool tip
+moves with the links; these are joint-space trajectories, not a prescribed
+Cartesian line. The RG2 fingers remain rigid because the model does not yet
+provide independently controlled finger joints.
 
-`time` is Python's standard library; `monotonic()` measures elapsed wall time
-without jumping when simulation time resets. `rclpy` is the ROS 2 Python client
-library. Its `Node` supplies subscriptions and logging, `ActionClient` handles
-the goal protocol, and `spin_once` dispatches callbacks. The sensor-data QoS
-accepts best-effort feedback publishers. `SignalHandlerOptions.NO` leaves
-Ctrl+C as a Python interruption so cancellation can run before ROS shuts down.
+These small excursions do not represent full mechanical travel. The converted
+model still needs collision and physical-limit validation before larger motions.
+This demo does not run a collision planner. Observe the first run in Gazebo.
 
-`FollowJointTrajectory` and `JointTolerance` come from `control_msgs`.
-`JointTrajectoryPoint` comes from `trajectory_msgs`; `JointState` comes from
-`sensor_msgs`; `Duration` comes from `builtin_interfaces`; `GoalStatus` comes
-from `action_msgs`. These are generated ROS interface classes, not classes
-we invented. `JOINTS`, `WAYPOINTS` and `home_error` are our own definitions.
+## Understand the code
 
-### 2. main creates the ROS participant
+`joint_sequence.py` is the ROS action client. Its comments explain the execution
+order: `main()` creates the node, `__init__()` establishes communications, and
+`run()` checks feedback and home, builds and sends a goal, then waits for its
+result. A goal being accepted is different from successful execution.
 
-`rclpy.init` initializes ROS communication. `JointSequence()` constructs our
-node, and `node.run()` performs one experiment. `self` in class methods refers
-to that particular node object, much like `this` in C++.
+`sequence.py` is plain Python data and helpers. `build_waypoints()` converts
+segment durations into cumulative arrival times. Each waypoint contains all six
+absolute positions and a stage description. Changing this file changes the
+experiment; it does not add a new ROS controller.
 
-The constructor calls the parent `Node` constructor with the name
-`pieas_joint_sequence`. It creates an action client for
-`/arm_controller/follow_joint_trajectory` and a subscription to `/joint_states`.
-The action name and type must match the existing controller's server.
-Constructing the client does not move the robot.
+`make_goal()` gives every waypoint zero endpoint velocity. The controller can
+therefore interpolate a smooth rest-to-rest cubic segment between positions.
+Repeated positions with a later timestamp create a hold. All six joints share
+the waypoint time, so they arrive together even when they travel different distances.
+This is trajectory execution with manually chosen waypoints, not automatic path planning.
 
-Members such as `self.goal_handle` retain information across method calls;
-local variables such as `point` exist within a method call. Python manages
-object references here rather than requiring C-style address operators.
+Feedback prints desired minus actual position. Final success checks the action
+status and controller result, with final position tolerances of 2 mm for the
+rail and 0.01 rad for rotary joints. Final success alone does not certify every
+intermediate position or collision clearance.
 
-### 3. run waits for readiness
+## Starting, stopping and failures
 
-The action server must be discoverable within ten seconds. Then `spin_once`
-allows incoming joint messages to call `read_state`. That callback stores the
-message, compares its timestamp with the previous timestamp, and records when
-it arrived. Two advancing timestamps help distinguish a live simulation from
-an old or paused sample.
+The client requires fresh advancing joint feedback, finite values, and all joints
+near home and stopped. It refuses to start otherwise; it does not automatically
+move an unknown pose home. Ctrl+C requests cancellation of this goal and waits
+briefly for confirmation. Cancellation does not return home. If cancellation is
+not confirmed, pause Gazebo. Do not reset the world during an active goal.
 
-`home_error` checks all six joints by name, not assumed incoming array order.
-It rejects missing, duplicate, non-finite or incomplete data. Home tolerances
-are 0.002 m for joint 1 and 0.01 rad for rotary joints; stopped-speed checks use
-0.002 m/s and 0.01 rad/s respectively. These are lesson checks, not hardware
-safety limits. The program refuses rather than automatically moving home from
-an unknown pose.
+There is a wall-time timeout of five times the planned duration plus 30 seconds.
+It remains effective when Gazebo is paused. After interruption, restore a valid
+home state before rerunning.
 
-### 4. make_goal constructs the message
+## Validation
 
-`FollowJointTrajectory.Goal()` creates the request object. Its `trajectory`
-contains joint names and a list of points. Each iteration creates a NEW point,
-sets all six positions, zero endpoint velocities, and a cumulative duration,
-then appends it to the list. Reusing and mutating one point object would be a
-mistake because Python lists retain references to objects.
-
-A zero default header timestamp means start when the controller receives the
-trajectory. Zero endpoint velocities mean stop at those waypoints, not stay
-stationary for the whole motion. The controller generates intermediate
-references. Joint 1 positions are metres; joints 2-6 are radians.
-
-The final goal tolerances make endpoint success meaningful: 0.002 m for the
-slide and 0.01 rad for each rotary joint, with three extra simulation seconds
-allowed to settle. We do not set custom path tolerances in this lesson;
-tracking throughout motion is observed, not fully certified by this result.
-
-### 5. send_goal_async sends, but does not wait for completion
-
-The returned future represents the pending acceptance/rejection response.
-A future is an object whose result becomes available later. `wait_for` keeps
-calling `spin_once`, so ROS can process subscription, action-response and
-feedback callbacks while we wait. It is called outside callbacks, avoiding a
-callback that blocks its own executor.
-
-Once acceptance arrives, `goal_handle.accepted` tells us whether execution was
-accepted. It does not mean the arm finished moving. `get_result_async()` returns
-a second future for eventual completion.
-
-### 6. feedback reports progress
-
-Passing `feedback_callback=self.feedback` registers the function to call for
-action feedback. `self.feedback` passes the bound method; `self.feedback()`
-would call it immediately, which is not what registration needs.
-
-The callback reads the message's `feedback`, finds joint 2 by name, and prints
-its desired position, actual position and their difference. Output is limited
-to once per wall-clock second so the terminal remains readable. Feedback fields
-here are `desired` and `actual`; the separate controller-state topic uses
-`reference` and `feedback`. Message field names depend on the interface type.
-
-### 7. completion and cleanup
-
-The program requires BOTH action status SUCCEEDED and controller error code
-SUCCESSFUL. Rejection, abort and timeout produce a failure exit code rather
-than a success message. Ctrl+C or an error while a goal is pending triggers a
-bounded cancellation attempt. Cancellation confirmation is separate from
-assuming the robot stopped; inspect it or pause Gazebo when uncertain.
-
-Finally, `destroy_node` releases the node and `rclpy.shutdown` ends ROS
-communication for this process. Gazebo and the controller remain running.
-The successful trajectory ends at home, so it leaves the target at zero.
-
-## What to observe
-
-Watch both pauses and the direction change. Read the printed desired versus
-actual angles during movement. At completion, inspect one `/joint_states`
-message if needed. The action result confirms only the configured criteria;
-it does not demonstrate collision avoidance or hardware realism.
-
-## Validation and reference
-
-Python syntax, package metadata and offline tests of home checks and the
-trajectory's rest-to-rest cubic peak speed were checked. The peak speed of the
-moving segments is 0.01875 rad/s, below joint 2's 0.034906585 rad/s ceiling.
-This environment has no ROS/Gazebo, so the new Python client has NOT yet been
-executed against a live controller. The terminal version of the sequence was
-confirmed by the user.
-
-ROS 2 Jazzy action-client tutorial source:
-https://github.com/ros2/ros2_documentation/blob/jazzy/source/Tutorials/Intermediate/Writing-an-Action-Server-Client/Py.rst
-
-Trajectory controller:
-https://control.ros.org/jazzy/doc/ros2_controllers/joint_trajectory_controller/doc/userdoc.html
+`test/test_sequence.py` checks feedback validation, individual-joint isolation,
+coverage of all six joints, final home, and cubic peak speeds against the URDF
+velocity limits. These are offline checks, not evidence of a completed Gazebo run.
+Run with `colcon test --packages-select pieas_arm_control` in the ROS workspace.
