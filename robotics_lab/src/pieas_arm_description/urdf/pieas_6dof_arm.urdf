@@ -187,14 +187,14 @@
     <child link="elbow_link" />
     <origin xyz="-4.11575832122e-06 -2.94129452787e-06 0.139410171371" rpy="-1.57078947493 0.00132489761668 -1.83173785084e-06" />
     <axis xyz="0 0 1" />
-    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+    <limit effort="10" velocity="0.5" lower="-3.14159265359" upper="3.14159265359" />
   </joint>
   <joint name="joint_4" type="revolute">
     <parent link="elbow_link" />
     <child link="forearm_link" />
     <origin xyz="0.162775198791 -0.00042495666064 0.000596459765891" rpy="6.19476692165e-13 -7.34640979516e-06 -0.00872664626018" />
     <axis xyz="0 0 1" />
-    <limit effort="10" velocity="0.0349065850399" lower="-3.14159265359" upper="3.14159265359" />
+    <limit effort="10" velocity="0.5" lower="-3.14159265359" upper="3.14159265359" />
   </joint>
   <joint name="joint_5" type="revolute">
     <parent link="forearm_link" />
