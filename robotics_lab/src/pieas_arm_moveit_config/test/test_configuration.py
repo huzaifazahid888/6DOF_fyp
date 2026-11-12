@@ -81,3 +81,31 @@ def test_world_generation_enables_self_contact_even_with_false_overrides():
         assert all(link.findtext('self_collide') == 'true' for link in model.findall('link'))
     finally:
         shutil.rmtree(directory)
+
+
+def test_client_does_not_overwrite_node_handle():
+    # Exercise the real constructor with a read-only Node.handle, like rclpy.
+    script = ROOT / 'scripts/plan_joint_goal'
+    tree = ast.parse(script.read_text())
+    planner = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Planner')
+
+    class FakeNode:
+        def __init__(self, name):
+            pass
+
+        @property
+        def handle(self):
+            return 'reserved ROS node handle'
+
+        def declare_parameter(self, *args):
+            pass
+
+        def create_subscription(self, *args):
+            return object()
+
+    scope = dict(Node=FakeNode, ActionClient=lambda *args: object(),
+                 JointState=object, MoveGroup=object, qos_profile_sensor_data=object())
+    exec(compile(ast.Module(body=[planner], type_ignores=[]), str(script), 'exec'), scope)
+    node = scope['Planner']()
+    assert node.handle == 'reserved ROS node handle'
+    assert node.goal_handle is None

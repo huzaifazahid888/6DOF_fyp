@@ -34,7 +34,7 @@ class Planner(Node):
         self.received = 0.0
         self.advancing = False
         self.goal_future = None
-        self.handle = None
+        self.goal_handle = None
         self.result_future = None
         self.subscription = self.create_subscription(
             JointState, '/joint_states', self.receive, qos_profile_sensor_data)
@@ -177,10 +177,10 @@ class Planner(Node):
         self.get_logger().info('Planning and executing.' if execute else
                                'Planning only: the Gazebo robot will not move.')
         self.goal_future = self.client.send_goal_async(goal)
-        self.handle = self.wait(self.goal_future)
-        if not self.handle.accepted:
+        self.goal_handle = self.wait(self.goal_future)
+        if not self.goal_handle.accepted:
             raise RuntimeError('MoveIt rejected the goal.')
-        self.result_future = self.handle.get_result_async()
+        self.result_future = self.goal_handle.get_result_async()
         response = self.wait(self.result_future, 180)
         result = response.result
         if response.status != GoalStatus.STATUS_SUCCEEDED or result.error_code.val != MoveItErrorCodes.SUCCESS:
@@ -195,17 +195,17 @@ class Planner(Node):
 
     def cancel(self):
         # Handle late acceptance too, so Ctrl+C does not knowingly orphan a goal.
-        if self.handle is None and self.goal_future is not None:
-            self.handle = self.wait(self.goal_future, 3)
-        if self.handle is None or not self.handle.accepted:
+        if self.goal_handle is None and self.goal_future is not None:
+            self.goal_handle = self.wait(self.goal_future, 3)
+        if self.goal_handle is None or not self.goal_handle.accepted:
             return
         if self.result_future is not None and self.result_future.done():
             return
-        response = self.wait(self.handle.cancel_goal_async(), 3)
+        response = self.wait(self.goal_handle.cancel_goal_async(), 3)
         if not response.goals_canceling:
             raise RuntimeError('Cancellation not acknowledged.')
         if self.result_future is None:
-            self.result_future = self.handle.get_result_async()
+            self.result_future = self.goal_handle.get_result_async()
         self.wait(self.result_future, 3)
 
 
