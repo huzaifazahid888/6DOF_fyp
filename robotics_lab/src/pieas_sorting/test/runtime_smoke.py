@@ -28,10 +28,13 @@ with launch_log.open('w') as output:
         assert 'FACTORY: COMPLETE' in sort_log.read_text()
         print('PASS: real sensor streams and one complete sorting cycle.')
     finally:
-        os.killpg(process.pid,signal.SIGINT)
+        try:os.killpg(process.pid,signal.SIGINT)
+        except ProcessLookupError:pass
         try:process.wait(timeout=20)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid,signal.SIGKILL);process.wait()
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            process.wait()
         print('Launch log:',launch_log,'Task log:',sort_log)
         # Include diagnostics in the ordinary CI job log as well as artifacts.
         for path in [launch_log,sort_log]:

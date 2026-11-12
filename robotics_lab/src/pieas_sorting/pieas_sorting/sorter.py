@@ -160,6 +160,7 @@ class Sorter(ToolSequence):
             if self.service(GetStateValidity,'/check_state_validity',request).valid:
                 chosen=solution;break
         if chosen is None:raise RuntimeError(f'No bounded, upright, collision-free IK at {xyz}.')
+        self.get_logger().info(f'IK {label}: rail metres, then radians = {np.round(chosen,5).tolist()}')
         plan=self.plan_targets(chosen.tolist(),start_state=start,plan_only=True,precise=True)
         endpoint=self.predicted_end(plan,start)
         error=self.distance(self.xyz(self.forward(endpoint)),xyz)
@@ -168,7 +169,9 @@ class Sorter(ToolSequence):
         rclpy.spin_once(self,timeout_sec=0.05)
         if time.monotonic()-self.machine_wall>1.:raise RuntimeError('Stale machine state before execution.')
         current=self.measured()
-        if np.max(np.abs(np.array(self.positions(current))-q))>0.01:raise RuntimeError('Robot moved during planning.')
+        delta=np.array(self.positions(current))-q
+        delta[-1]=math.atan2(math.sin(delta[-1]),math.cos(delta[-1]))
+        if np.any(np.abs(delta)>np.array([.002,.01,.01,.01,.01,.01])):raise RuntimeError('Robot moved during planning.')
         self.execute_leg(plan)
         actual=self.measured()
         pose=self.forward(actual)
@@ -177,6 +180,7 @@ class Sorter(ToolSequence):
         transform=self.kinematics.forward(self.positions(actual))
         if transform[2,2]<math.cos(self.c['motion']['upright_tolerance']):raise RuntimeError('Tool not upright at endpoint.')
         if self.expect_payload and (not self.machine or not self.machine['held']):raise RuntimeError('Payload attachment lost.')
+        self.get_logger().info(f'{label}: measured-state FK endpoint error {error*1000:.2f} mm')
         return error
 
     def wait_detection(self):
@@ -196,10 +200,19 @@ class Sorter(ToolSequence):
         # Keep this object's real dimensions in MoveIt during transport. Only the
         # suction link may touch it; other arm links remain collision checked.
         attached=AttachedCollisionObject(link_name='rg2_link',object=copy.deepcopy(obj),touch_links=['rg2_link'])
-        remove=CollisionObject(id=obj.id,operation=CollisionObject.REMOVE)
-        self.scene(objects=[remove],attached=[attached])
+        # MoveIt attaches first and automatically removes the world object.
+        # A second explicit world REMOVE in this same diff would fail.
+        self.scene(attached=[attached])
+        self.verify_attachment(obj.id,True)
 
-    def detach_scene(self,obj,xyz):
+    def verify_attachment(self,name,expected):
+        query=GetPlanningScene.Request()
+        query.components.components=PlanningSceneComponents.ROBOT_STATE_ATTACHED_OBJECTS
+        response=self.service(GetPlanningScene,'/get_planning_scene',query)
+        present=any(item.object.id==name for item in response.scene.robot_state.attached_collision_objects)
+        if present!=expected:raise RuntimeError('MoveIt payload attachment state disagrees with the task.')
+
+    def detach_scene(self,obj,xyz,remove_attachment=True):
         detached=AttachedCollisionObject(link_name='rg2_link')
         detached.object.id=obj.id;detached.object.operation=CollisionObject.REMOVE
         placed=copy.deepcopy(obj)
@@ -211,7 +224,8 @@ class Sorter(ToolSequence):
             d=placed.primitives[0].dimensions
             extent=math.hypot(d[0],d[1]);placed.primitives[0].dimensions=[extent,extent,d[2]]
         p.orientation.x=p.orientation.y=p.orientation.z=0.;p.orientation.w=1.
-        self.scene(objects=[placed],attached=[detached])
+        self.scene(objects=[placed],attached=[detached] if remove_attachment else [])
+        self.verify_attachment(obj.id,False)
 
     def install_cell_scene(self):
         self.setup_scene()
@@ -289,7 +303,7 @@ class Sorter(ToolSequence):
                 if not verifier.update(xyz,self.machine['sim_time']):return False
                 settled.append(list(xyz));return True
             self.spin_until(inside_bin,8,'released object inside the intended bin')
-            self.detach_scene(obj,settled[-1])
+            self.detach_scene(obj,settled[-1],remove_attachment=False)
             self.placed[shape]+=1
             self.records.append({'cycle':cycle+1,'shape':shape,'confidence':detected['confidence'],
                                  'lidar_points':detected['lidar_points'],'wall_seconds':time.monotonic()-started,

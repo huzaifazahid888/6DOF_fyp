@@ -90,9 +90,10 @@ Ctrl+C in the task terminal requests trajectory cancellation and stops the belt.
 | 6 | `pieas_sorting/perception.py` | ROS subscriptions, freshness, stability and debug output |
 | 7 | `pieas_sorting/kinematics.py` | Bounded upright-tool numerical IK; yaw is free |
 | 8 | `pieas_sorting/sorter.py` | Task states, MoveIt scene changes, planning, execution and verification |
-| 9 | `src/factory_system.cpp` | Gazebo traction, station indexing, watchdog and suction physics joint |
-| 10 | `launch/factory.launch.py` | Connect the complete system |
-| 11 | `test/test_core.py` | CPU tests of geometry, perception and IK |
-| 12 | `test/runtime_smoke.py` | Explicit real ROS/Gazebo sensor + pick/place test |
+| 9 | `pieas_sorting/task_logic.py` | Validate sensor goals and require a stationary drop inside the correct bin |
+| 10 | `src/factory_system.cpp` | Gazebo traction, station indexing, watchdog and suction physics joint |
+| 11 | `launch/factory.launch.py` | Connect the complete system |
+| 12 | `test/test_core.py` | CPU tests of geometry, perception and IK |
+| 13 | `test/runtime_smoke.py` | Explicit real ROS/Gazebo sensor + pick/place test |
 
 All positions in configuration are world metres; angles are radians. Bin names map perception classes to destinations. `cell.yaml` is not a general robot calibration file: changing camera pose requires matching real-world calibration if this is later deployed on hardware.
