@@ -87,4 +87,4 @@ def main():
     rclpy.init();node=Perception()
     try:rclpy.spin(node)
     except KeyboardInterrupt:pass
-    finally:node.destroy_node();rclpy.shutdown()
+    finally:node.destroy_node();rclpy.try_shutdown()

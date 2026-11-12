@@ -129,3 +129,22 @@ def test_drop_requires_stationary_independent_samples_in_correct_bin():
     assert v.update([.2,-.21,.045],1.5)
     assert not v.update([.5,-.21,.045],1.6)
     assert not v.update([.2,-.21,.15],1.7)
+
+
+def test_ros_string_callbacks_read_fields_and_detect_clock_reset():
+    # Execute the adapter callbacks with ROS-shaped messages (data is a FIELD,
+    # unlike Gazebo protobuf's data() accessor). No ROS runtime is needed here.
+    import ast,json,time
+    from types import SimpleNamespace
+    tree=ast.parse((PACKAGE/'pieas_sorting/sorter.py').read_text())
+    cls=next(node for node in tree.body if isinstance(node,ast.ClassDef) and node.name=='Sorter')
+    methods=[node for node in cls.body if isinstance(node,ast.FunctionDef) and node.name in ('machine_callback','detection_callback')]
+    scope={'json':json,'time':time}
+    exec(compile(ast.Module(body=methods,type_ignores=[]),'<callbacks>','exec'),scope)
+    node=SimpleNamespace(last_sim=None,reset_detected=False)
+    scope['machine_callback'](node,SimpleNamespace(data=json.dumps({'sim_time':10.,'held':False})))
+    assert node.machine['held'] is False and node.last_sim==10.
+    scope['detection_callback'](node,SimpleNamespace(data=json.dumps({'detections':[]})))
+    assert node.detection['detections']==[] and node.detection_wall>0
+    scope['machine_callback'](node,SimpleNamespace(data=json.dumps({'sim_time':1.})))
+    assert node.reset_detected is True

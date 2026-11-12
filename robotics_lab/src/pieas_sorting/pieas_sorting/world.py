@@ -139,7 +139,7 @@ def build_world(c):
                 for k,v in [('samples',samples),('resolution',1),('min_angle',-0.12),('max_angle',0.12)]:text(s,k,v)
             ran=ET.SubElement(lidar,'range')
             for k,v in [('min',0.05),('max',2),('resolution',0.001)]:text(ran,k,v)
-            noise=ET.SubElement(lidar,'noise',type='gaussian');text(noise,'mean',0);text(noise,'stddev',0.001)
+            noise=ET.SubElement(lidar,'noise');text(noise,'type','gaussian');text(noise,'mean',0);text(noise,'stddev',0.001)
     plugin=ET.SubElement(world,'plugin',filename='pieas_factory_system',name='pieas::FactorySystem')
     for k,v in {'belt_x':b['x'],'belt_top':b['top'],'belt_half_width':b['width']/2,'belt_y_min':b['y_min'],
                 'belt_y_max':b['y_max'],'stop_y':b['stop_y'],'speed':b['speed'],'part_count':p['count'],'part_height':p['height']}.items():text(plugin,k,v)

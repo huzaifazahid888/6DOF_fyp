@@ -12,6 +12,7 @@ from pathlib import Path
 import runpy
 import time
 import uuid
+import traceback
 import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_prefix,get_package_share_directory
@@ -52,13 +53,13 @@ class Sorter(ToolSequence):
         self.scene_object=None;self.records=[]
 
     def machine_callback(self,message):
-        value=json.loads(message.data())
+        value=json.loads(message.data)
         if self.last_sim is not None and value['sim_time']<self.last_sim:
             self.phase='FAULT_RESET';self.reset_detected=True
         self.last_sim=value['sim_time'];self.machine=value;self.machine_wall=time.monotonic()
 
     def detection_callback(self,message):
-        self.detection=json.loads(message.data());self.detection_wall=time.monotonic()
+        self.detection=json.loads(message.data);self.detection_wall=time.monotonic()
 
     def phase_to(self,name):
         self.phase=name;self.get_logger().info(f'FACTORY: {name}')
@@ -331,6 +332,7 @@ def main():
         node=Sorter();node.run()
     except (Exception,KeyboardInterrupt) as error:
         code=1
+        if not isinstance(error,KeyboardInterrupt):traceback.print_exc()
         if node is not None:
             node.get_logger().error(str(error) or 'Interrupted')
             node.phase_to('FAULT')
