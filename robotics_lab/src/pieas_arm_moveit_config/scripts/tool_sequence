@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""XYZ task: plan every leg first, then optionally execute the exact plans.
+
+Coordinates are offsets in WORLD axes from the measured starting tool position.
+This positions the saved tool0 frame; it does not constrain gripper orientation
+or promise a straight Cartesian path. Collision-aware joint paths connect goals.
+"""
+import copy
+import math
+from pathlib import Path
+import runpy
+import xml.etree.ElementTree as ET
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.qos import QoSProfile, DurabilityPolicy
+from rclpy.signals import SignalHandlerOptions
+from action_msgs.msg import GoalStatus
+from builtin_interfaces.msg import Duration
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import JointState
+from visualization_msgs.msg import Marker, MarkerArray
+from moveit_msgs.msg import RobotState, MoveItErrorCodes, DisplayTrajectory
+from moveit_msgs.srv import GetPositionFK, GetPositionIK, GetStateValidity
+from moveit_msgs.action import ExecuteTrajectory
+from ament_index_python.packages import get_package_share_directory
+
+# Reuse our existing client, not a second implementation of the ROS connection.
+Planner = runpy.run_path(str(Path(__file__).with_name('plan_joint_goal')))['Planner']
+JOINTS = [f'joint_{i}' for i in range(1, 7)]
+
+
+class ToolSequence(Planner):
+    def __init__(self):
+        super().__init__()
+        # Each offset is measured from the ORIGINAL position, not the last target.
+        self.declare_parameter('lift', [0.0, 0.0, 0.03])
+        self.declare_parameter('across', [0.0, 0.03, 0.03])
+        self.declare_parameter('position_tolerance', 0.003)
+        self.execution_client = ActionClient(self, ExecuteTrajectory, '/execute_trajectory')
+        qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.targets_publisher = self.create_publisher(MarkerArray, '/tool_targets', qos)
+        self.preview_publisher = self.create_publisher(DisplayTrajectory, '/display_planned_path', qos)
+        package = Path(get_package_share_directory('pieas_arm_description'))
+        self.model = ET.parse(package / 'urdf/pieas_control.urdf.in').getroot()
+
+    def forward(self, state):
+        # FK asks: where does tool0 end up for these joint coordinates?
+        request = GetPositionFK.Request()
+        request.header.frame_id = 'world'
+        request.fk_link_names = ['tool0']
+        request.robot_state = state
+        response = self.service(GetPositionFK, '/compute_fk', request)
+        if response.error_code.val != MoveItErrorCodes.SUCCESS or not response.pose_stamped:
+            raise RuntimeError(f'FK failed: {response.error_code.val}')
+        return response.pose_stamped[0]
+
+    @staticmethod
+    def xyz(pose):
+        p = pose.pose.position
+        return [p.x, p.y, p.z]
+
+    @staticmethod
+    def distance(a, b):
+        return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+    def positions(self, state):
+        s = state.joint_state
+        if len(s.name) != len(s.position) or len(set(s.name)) != len(s.name):
+            raise RuntimeError('Invalid solver joint-state arrays.')
+        values = dict(zip(s.name, s.position))
+        if not all(n in values and math.isfinite(values[n]) for n in JOINTS):
+            raise RuntimeError('IK solution is missing finite arm joint coordinates.')
+        for name in JOINTS:
+            joint = self.model.find(f"joint[@name='{name}']")
+            if joint.get('type') != 'continuous':
+                limit = joint.find('limit')
+                if not float(limit.get('lower')) <= values[name] <= float(limit.get('upper')):
+                    raise RuntimeError(f'IK solution outside URDF bounds: {name}')
+        return [values[n] for n in JOINTS]
+
+    def inverse(self, target, seed):
+        # IK asks: which joint coordinates put tool0 at the requested XYZ?
+        request = GetPositionIK.Request()
+        ik = request.ik_request
+        ik.group_name = 'arm'
+        ik.ik_link_name = 'tool0'
+        ik.pose_stamped = target
+        ik.robot_state = seed
+        ik.avoid_collisions = True
+        ik.timeout = Duration(sec=2)
+        response = self.service(GetPositionIK, '/compute_ik', request)
+        if response.error_code.val != MoveItErrorCodes.SUCCESS:
+            raise RuntimeError(f'No collision-free IK solution: code {response.error_code.val}. '
+                               'Try smaller XYZ offsets or a different valid starting configuration.')
+        state = response.solution
+        state.is_diff = True
+        self.positions(state)
+        if self.distance(self.xyz(self.forward(state)), self.xyz(target)) > self.tolerance:
+            raise RuntimeError('IK solution failed independent FK position verification.')
+        return state
+
+    def predicted_end(self, trajectory, seed):
+        # Preserve the complete start state; replace only joints in the plan.
+        state = copy.deepcopy(seed)
+        values = dict(zip(state.joint_state.name, state.joint_state.position))
+        jt = trajectory.joint_trajectory
+        values.update(zip(jt.joint_names, jt.points[-1].positions))
+        state.joint_state = JointState(name=list(values), position=list(values.values()))
+        state.is_diff = True
+        return state
+
+    def show_targets(self, targets):
+        markers = MarkerArray()
+        for index, target in enumerate(targets):
+            marker = Marker()
+            marker.header.frame_id = 'world'
+            marker.ns = 'tool_targets'
+            marker.id = index
+            marker.type = Marker.SPHERE
+            marker.action = Marker.ADD
+            marker.pose = copy.deepcopy(target.pose)
+            marker.pose.orientation.x = marker.pose.orientation.y = marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
+            marker.scale.x = marker.scale.y = marker.scale.z = 0.008
+            marker.color.a = 1.0
+            marker.color.r, marker.color.g, marker.color.b = [(0.1, 0.8, 0.1), (0.1, 0.4, 1.0), (1.0, 0.5, 0.1)][index]
+            markers.markers.append(marker)
+        self.targets_publisher.publish(markers)
+
+    def execute_leg(self, trajectory):
+        if not self.execution_client.wait_for_server(timeout_sec=15):
+            raise RuntimeError('ExecuteTrajectory action unavailable.')
+        goal = ExecuteTrajectory.Goal()
+        goal.trajectory = trajectory
+        goal.controller_names = ['arm_controller']
+        self.goal_future = self.execution_client.send_goal_async(goal)
+        self.goal_handle = self.wait(self.goal_future)
+        if not self.goal_handle.accepted:
+            raise RuntimeError('MoveIt rejected trajectory execution.')
+        self.result_future = self.goal_handle.get_result_async()
+        response = self.wait(self.result_future, 180)
+        if response.status != GoalStatus.STATUS_SUCCEEDED or response.result.error_code.val != MoveItErrorCodes.SUCCESS:
+            raise RuntimeError(f'Execution failed: action {response.status}, code {response.result.error_code.val}')
+
+    def run(self):
+        self.tolerance = self.get_parameter('position_tolerance').value
+        if not math.isfinite(self.tolerance) or not 0 < self.tolerance <= 0.01:
+            raise RuntimeError('position_tolerance must be greater than 0 and at most 0.01 m.')
+        self.setup_scene()
+        self.check_measured_state()
+        original = RobotState()
+        original.joint_state = copy.deepcopy(self.state)
+        original.is_diff = True
+        baseline = self.forward(original)
+        self.get_logger().info(f'Starting tool0 XYZ in world: {self.xyz(baseline)}')
+        targets = []
+        for name in ['lift', 'across']:
+            offset = self.get_parameter(name).value
+            if len(offset) != 3 or not all(math.isfinite(v) for v in offset):
+                raise RuntimeError(f'{name} must contain three finite metre offsets.')
+            if math.sqrt(sum(v * v for v in offset)) > 0.10:
+                raise RuntimeError('This first XYZ task limits each offset to 0.10 m from the start.')
+            target = copy.deepcopy(baseline)
+            target.header.stamp.sec = target.header.stamp.nanosec = 0
+            target.pose.position.x += offset[0]
+            target.pose.position.y += offset[1]
+            target.pose.position.z += offset[2]
+            targets.append(target)
+        targets.append(copy.deepcopy(baseline))
+        self.show_targets(targets)
+
+        # Plan the WHOLE task before allowing any movement. Use each planned
+        # endpoint as the next start, including in preview-only mode.
+        seed = original
+        plans = []
+        for index, target in enumerate(targets):
+            self.get_logger().info(f'Leg {index + 1}/3 target tool0 XYZ: {self.xyz(target)}')
+            solution = self.inverse(target, seed) if index < 2 else original
+            plan = self.plan_targets(self.positions(solution), start_state=seed,
+                                     plan_only=True, precise=True)
+            seed = self.predicted_end(plan, seed)
+            error = self.distance(self.xyz(self.forward(seed)), self.xyz(target))
+            if error > self.tolerance:
+                raise RuntimeError(f'Planned endpoint tool position error {error:.6f} m exceeds tolerance.')
+            plans.append(plan)
+            self.get_logger().info(f'Leg {index + 1} planned endpoint position error: {error * 1000:.2f} mm')
+
+        display = DisplayTrajectory()
+        display.model_id = self.model.get('name')
+        display.trajectory_start = original
+        display.trajectory = plans
+        self.preview_publisher.publish(display)
+        if not self.get_parameter('execute').value:
+            self.get_logger().info('All three legs planned. Preview only; Gazebo has not been commanded to move.')
+            return
+
+        for index, (plan, target) in enumerate(zip(plans, targets)):
+            self.check_measured_state()
+            # Refuse stale precomputed plans if another client moved the robot.
+            expected = dict(zip(plan.joint_trajectory.joint_names,
+                                plan.joint_trajectory.points[0].positions))
+            actual = dict(zip(self.state.name, self.state.position))
+            for name in JOINTS:
+                error = actual[name] - expected[name]
+                if name == 'joint_6':
+                    error = math.atan2(math.sin(error), math.cos(error))
+                if abs(error) > (0.002 if name == 'joint_1' else 0.01):
+                    raise RuntimeError(f'Start state changed before leg {index + 1}: {name}. Replan the task.')
+            self.get_logger().info(f'Executing leg {index + 1}/3')
+            self.execute_leg(plan)
+            self.check_measured_state()
+            measured = RobotState(joint_state=copy.deepcopy(self.state), is_diff=True)
+            error = self.distance(self.xyz(self.forward(measured)), self.xyz(target))
+            self.get_logger().info(f'Leg {index + 1} measured-state FK position error: {error * 1000:.2f} mm')
+            if error > self.tolerance:
+                raise RuntimeError('Measured tool position error exceeds tolerance; remaining legs not executed.')
+        self.get_logger().info('XYZ task completed: lift, across, return to original joint configuration.')
+
+
+def main():
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    node = None
+    code = 0
+    try:
+        node = ToolSequence()
+        node.run()
+    except (Exception, KeyboardInterrupt) as error:
+        code = 1
+        if node is not None:
+            node.get_logger().error(str(error) or 'Interrupted.')
+            try:
+                node.cancel()
+            except (Exception, KeyboardInterrupt) as cancel_error:
+                node.get_logger().error(f'Cancellation unconfirmed: {cancel_error}. Pause Gazebo.')
+        else:
+            print(f'Node initialization failed: {error}')
+    finally:
+        if node is not None:
+            node.destroy_node()
+        rclpy.shutdown()
+    return code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

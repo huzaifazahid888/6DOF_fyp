@@ -144,6 +144,10 @@ class Planner(Node):
         # not assertions about the physical robot's mechanical end stops.
         if abs(targets[0]) > 0.02 or any(abs(x) > 0.3 for x in targets[1:]):
             raise RuntimeError('First-lesson target bounds: rail +/-0.02 m, angles +/-0.3 rad.')
+        self.plan_targets(targets)
+
+    def plan_targets(self, targets, start_state=None, plan_only=None, precise=False):
+        """Plan an explicit joint goal; other clients can supply a predicted start."""
         if not self.client.wait_for_server(timeout_sec=30):
             raise RuntimeError('MoveGroup action server unavailable.')
         goal = MoveGroup.Goal()
@@ -156,7 +160,10 @@ class Planner(Node):
         request.max_velocity_scaling_factor = 0.1
         request.max_acceleration_scaling_factor = 0.1
         # Use the live monitored start state, not a hard-coded home state.
-        request.start_state.is_diff = True
+        if start_state is None:
+            request.start_state.is_diff = True
+        else:
+            request.start_state = start_state
         request.workspace_parameters.header.frame_id = 'world'
         request.workspace_parameters.min_corner.x = -2.0
         request.workspace_parameters.min_corner.y = -2.0
@@ -166,12 +173,12 @@ class Planner(Node):
         request.workspace_parameters.max_corner.z = 2.0
         constraint = Constraints(name='small_joint_goal')
         for i, (name, position) in enumerate(zip(JOINTS, targets)):
-            tolerance = 0.001 if i == 0 else 0.005
+            tolerance = (0.0001 if i == 0 else 0.001) if precise else (0.001 if i == 0 else 0.005)
             constraint.joint_constraints.append(JointConstraint(
                 joint_name=name, position=position, tolerance_above=tolerance,
                 tolerance_below=tolerance, weight=1.0))
         request.goal_constraints = [constraint]
-        execute = self.get_parameter('execute').value
+        execute = self.get_parameter('execute').value if plan_only is None else not plan_only
         goal.planning_options.plan_only = not execute
         goal.planning_options.replan = False
         self.get_logger().info('Planning and executing.' if execute else
@@ -192,6 +199,8 @@ class Planner(Node):
         self.get_logger().info(f'Success: {len(points)} points, '
                                f'{duration.sec + duration.nanosec * 1e-9:.2f} simulation seconds. '
                                + ('Execution completed.' if execute else 'Preview the path in RViz.'))
+
+        return result.planned_trajectory
 
     def cancel(self):
         # Handle late acceptance too, so Ctrl+C does not knowingly orphan a goal.

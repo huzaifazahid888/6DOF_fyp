@@ -13,7 +13,17 @@ def test_model_group_controller_and_limits_match():
     srdf = ET.parse(ROOT / 'config/pieas_arm.srdf').getroot()
     assert urdf.attrib['name'] == srdf.attrib['name']
     names = [f'joint_{i}' for i in range(1, 7)]
-    assert [j.attrib['name'] for j in srdf.find('group').findall('joint')] == names
+    chain = srdf.find('group/chain')
+    assert chain.get('base_link') == 'base_link' and chain.get('tip_link') == 'tool0'
+    by_child = {j.find('child').get('link'): j for j in urdf.findall('joint')}
+    active = []
+    link = chain.get('tip_link')
+    while link != chain.get('base_link'):
+        joint = by_child[link]
+        if joint.get('type') != 'fixed':
+            active.append(joint.get('name'))
+        link = joint.find('parent').get('link')
+    assert list(reversed(active)) == names
     control = yaml.safe_load((ROOT / 'config/moveit_controllers.yaml').read_text())
     assert control['moveit_simple_controller_manager']['arm_controller']['joints'] == names
     limits = yaml.safe_load((ROOT / 'config/joint_limits.yaml').read_text())['joint_limits']
@@ -109,3 +119,40 @@ def test_client_does_not_overwrite_node_handle():
     node = scope['Planner']()
     assert node.handle == 'reserved ROS node handle'
     assert node.goal_handle is None
+
+
+
+def test_tool_sequence_uses_kinematics_and_preplans_before_execution():
+    config = yaml.safe_load((ROOT / 'config/kinematics.yaml').read_text())
+    assert config['arm']['position_only_ik'] is True
+    tree = ast.parse((ROOT / 'scripts/tool_sequence').read_text())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'ToolSequence')
+    run = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'run')
+    calls = [(n.lineno, n.func.attr) for n in ast.walk(run)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
+    assert min(line for line, name in calls if name == 'plan_targets') < min(line for line, name in calls if name == 'execute_leg')
+    inverse = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'inverse')
+    assert any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Attribute) and t.attr == 'avoid_collisions' for t in n.targets)
+               and isinstance(n.value, ast.Constant) and n.value.value is True for n in ast.walk(inverse))
+
+
+def test_tool_ik_solution_bounds_and_joint_name_mapping():
+    import math
+    from types import SimpleNamespace
+    tree = ast.parse((ROOT / 'scripts/tool_sequence').read_text())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'ToolSequence')
+    scope = dict(Planner=object, JOINTS=[f'joint_{i}' for i in range(1, 7)], math=math)
+    exec(compile(ast.Module(body=[cls], type_ignores=[]), 'tool_sequence', 'exec'), scope)
+    node = scope['ToolSequence'].__new__(scope['ToolSequence'])
+    node.model = ET.parse(DESCRIPTION / 'urdf/pieas_control.urdf.in').getroot()
+    names = list(reversed(scope['JOINTS']))
+    state = SimpleNamespace(joint_state=SimpleNamespace(name=names, position=[0.1] * 6))
+    assert node.positions(state) == [0.1] * 6
+    for bad in [math.nan, math.inf, 1.0]:
+        state.joint_state.position[-1] = bad  # joint_1 rail upper bound is 0.5 m
+        try:
+            node.positions(state)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('Invalid solver result accepted')

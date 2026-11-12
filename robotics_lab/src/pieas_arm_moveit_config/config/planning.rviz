@@ -22,6 +22,14 @@ Visualization Manager:
       Robot Alpha: 1.0
     Scene Geometry:
       Scene Alpha: 1.0
+  - Class: rviz_default_plugins/MarkerArray
+    Name: Tool Targets
+    Enabled: true
+    Marker Topic:
+      Value: /tool_targets
+      Depth: 1
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
 Window Geometry:
   Width: 1280
   Height: 900

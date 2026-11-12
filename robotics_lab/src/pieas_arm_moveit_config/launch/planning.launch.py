@@ -28,6 +28,7 @@ def generate_launch_description():
         'robot_description': description,
         'robot_description_semantic': (package / 'config/pieas_arm.srdf').read_text(),
         'robot_description_planning': config('joint_limits.yaml'),
+        'robot_description_kinematics': config('kinematics.yaml'),
         'planning_pipelines': ['ompl'],
         'default_planning_pipeline': 'ompl',
         'ompl': config('ompl_planning.yaml'),
