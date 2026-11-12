@@ -229,3 +229,59 @@ reachability for the default targets at home and small_test. Actual KDL/plugin
 loading, collision-valid IK, visualization and execution need the target Jazzy
 machine. Neither arbitrary reachable orientation nor collision-free success from
 all starting poses is claimed.
+
+
+# Milestone 3: preserve tool orientation during motion
+
+The optional orientation mode uses the same tool_sequence program:
+
+```bash
+ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p keep_orientation:=true
+```
+
+After a successful preview, plan afresh and execute with:
+
+```bash
+ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p keep_orientation:=true -p execute:=true
+```
+
+Stop the launch, pull, rebuild this package, and restart planning.launch.py before
+using this mode. The new arm_pose group must be loaded by move_group and RViz.
+No additional package installation is needed after the XYZ milestone.
+
+This mode preserves the INITIAL measured tool quaternion relative to world. It
+is appropriate for maintaining a downward gripper only when that initial pose
+already points the physical gripper downward. It does not automatically rotate
+a tilted starting gripper downward. The saved tool0 frame's local positive Z
+points approximately UP at home; do not assume positive tool Z is the gripper's
+approach direction. The visible gripper geometry and saved frame need calibration
+before real hardware use.
+
+Defaults in this mode: lift 20 mm along world Z, move 20 mm along world X at the
+raised height, then return to the original joint configuration. Unlike the free
+orientation task, the sideways leg uses X; XYZ motions with fixed orientation
+have more restrictive reachability near the singular home configuration.
+Offsets can be changed through the existing lift/across parameters.
+
+Files and responsibilities:
+
+- SRDF: adds arm_pose, a second planning group with the SAME six physical joints.
+- kinematics.yaml: arm retains position-only KDL; arm_pose uses full-pose KDL.
+- ompl_planning.yaml: provides the planner settings for arm_pose.
+- tool_sequence: requests full-pose IK and supplies an orientation PATH constraint
+  to every plan, including return. Endpoint-only orientation would be insufficient.
+- plan_joint_goal: accepts a planning group and optional path constraint for reuse.
+
+Default maximum total orientation error is 0.05 rad (about 2.86 degrees). Each
+rotation-vector component is constrained to that value divided by sqrt(3).
+The program checks FK orientation at every returned trajectory waypoint before
+executing any leg, reports maximum sampled angular errors, and checks measured
+joint-state FK orientation after each leg. MoveIt's path checking is discrete;
+these checks are not a proof of continuous physical orientation accuracy. The
+controller and actual dynamics can introduce additional error during execution.
+If collision/IK/path checks fail, the program does not remove the constraint or
+silently fall back to free orientation. Keep the environment static while executing.
+
+Validation here includes offline configuration tests, quaternion error tests, and
+numerical full-pose reachability examples. KDL convergence, constrained planning,
+and execution require validation on the target ROS/Gazebo installation.

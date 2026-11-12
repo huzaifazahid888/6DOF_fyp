@@ -2,8 +2,8 @@
 """XYZ task: plan every leg first, then optionally execute the exact plans.
 
 Coordinates are offsets in WORLD axes from the measured starting tool position.
-This positions the saved tool0 frame; it does not constrain gripper orientation
-or promise a straight Cartesian path. Collision-aware joint paths connect goals.
+This positions the saved tool0 frame. keep_orientation:=true also holds its
+starting orientation. Collision-aware paths need not be Cartesian straight lines.
 """
 import copy
 import math
@@ -19,7 +19,7 @@ from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
 from visualization_msgs.msg import Marker, MarkerArray
-from moveit_msgs.msg import RobotState, MoveItErrorCodes, DisplayTrajectory
+from moveit_msgs.msg import RobotState, MoveItErrorCodes, DisplayTrajectory, Constraints, OrientationConstraint
 from moveit_msgs.srv import GetPositionFK, GetPositionIK, GetStateValidity
 from moveit_msgs.action import ExecuteTrajectory
 from ament_index_python.packages import get_package_share_directory
@@ -33,8 +33,12 @@ class ToolSequence(Planner):
     def __init__(self):
         super().__init__()
         # Each offset is measured from the ORIGINAL position, not the last target.
-        self.declare_parameter('lift', [0.0, 0.0, 0.03])
-        self.declare_parameter('across', [0.0, 0.03, 0.03])
+        self.declare_parameter('keep_orientation', False)
+        self.keep_orientation = self.get_parameter('keep_orientation').value
+        self.group = 'arm_pose' if self.keep_orientation else 'arm'
+        self.declare_parameter('orientation_tolerance', 0.05)
+        self.declare_parameter('lift', [0.0, 0.0, 0.02 if self.keep_orientation else 0.03])
+        self.declare_parameter('across', [0.02, 0.0, 0.02] if self.keep_orientation else [0.0, 0.03, 0.03])
         self.declare_parameter('position_tolerance', 0.003)
         self.execution_client = ActionClient(self, ExecuteTrajectory, '/execute_trajectory')
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -63,6 +67,17 @@ class ToolSequence(Planner):
     def distance(a, b):
         return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
+    @staticmethod
+    def orientation_error(a, b):
+        # q and -q describe the same rotation; abs(dot) handles this equivalence.
+        qa, qb = a.pose.orientation, b.pose.orientation
+        va, vb = [qa.x, qa.y, qa.z, qa.w], [qb.x, qb.y, qb.z, qb.w]
+        norms = math.sqrt(sum(v*v for v in va) * sum(v*v for v in vb))
+        if not math.isfinite(norms) or norms < 1e-12:
+            raise RuntimeError('Invalid FK quaternion.')
+        dot = abs(sum(x*y for x, y in zip(va, vb)) / norms)
+        return 2.0 * math.acos(min(1.0, dot))
+
     def positions(self, state):
         s = state.joint_state
         if len(s.name) != len(s.position) or len(set(s.name)) != len(s.name):
@@ -82,12 +97,14 @@ class ToolSequence(Planner):
         # IK asks: which joint coordinates put tool0 at the requested XYZ?
         request = GetPositionIK.Request()
         ik = request.ik_request
-        ik.group_name = 'arm'
+        ik.group_name = self.group
         ik.ik_link_name = 'tool0'
         ik.pose_stamped = target
         ik.robot_state = seed
         ik.avoid_collisions = True
         ik.timeout = Duration(sec=2)
+        if self.orientation_constraint is not None:
+            ik.constraints = self.orientation_constraint
         response = self.service(GetPositionIK, '/compute_ik', request)
         if response.error_code.val != MoveItErrorCodes.SUCCESS:
             raise RuntimeError(f'No collision-free IK solution: code {response.error_code.val}. '
@@ -146,6 +163,10 @@ class ToolSequence(Planner):
         self.tolerance = self.get_parameter('position_tolerance').value
         if not math.isfinite(self.tolerance) or not 0 < self.tolerance <= 0.01:
             raise RuntimeError('position_tolerance must be greater than 0 and at most 0.01 m.')
+        self.angle_tolerance = self.get_parameter('orientation_tolerance').value
+        if not math.isfinite(self.angle_tolerance) or not 0.005 <= self.angle_tolerance <= 0.15:
+            raise RuntimeError('orientation_tolerance must be between 0.005 and 0.15 rad.')
+        self.orientation_constraint = None
         self.setup_scene()
         self.check_measured_state()
         original = RobotState()
@@ -153,6 +174,22 @@ class ToolSequence(Planner):
         original.is_diff = True
         baseline = self.forward(original)
         self.get_logger().info(f'Starting tool0 XYZ in world: {self.xyz(baseline)}')
+        if self.keep_orientation:
+            constraint = OrientationConstraint()
+            constraint.header.frame_id = 'world'
+            constraint.link_name = 'tool0'
+            constraint.orientation = copy.deepcopy(baseline.pose.orientation)
+            constraint.parameterization = OrientationConstraint.ROTATION_VECTOR
+            # Bound each rotation-vector component so total angular error is
+            # bounded by orientation_tolerance, rather than 3 unrelated angles.
+            axis_tolerance = self.angle_tolerance / math.sqrt(3.0)
+            constraint.absolute_x_axis_tolerance = axis_tolerance
+            constraint.absolute_y_axis_tolerance = axis_tolerance
+            constraint.absolute_z_axis_tolerance = axis_tolerance
+            constraint.weight = 1.0
+            self.orientation_constraint = Constraints(name='hold_starting_tool_orientation')
+            self.orientation_constraint.orientation_constraints = [constraint]
+            self.get_logger().info(f'Holding initial tool orientation; total angular tolerance {self.angle_tolerance:.3f} rad.')
         targets = []
         for name in ['lift', 'across']:
             offset = self.get_parameter(name).value
@@ -177,7 +214,22 @@ class ToolSequence(Planner):
             self.get_logger().info(f'Leg {index + 1}/3 target tool0 XYZ: {self.xyz(target)}')
             solution = self.inverse(target, seed) if index < 2 else original
             plan = self.plan_targets(self.positions(solution), start_state=seed,
-                                     plan_only=True, precise=True)
+                                     plan_only=True, precise=True,
+                                     group_name=self.group, path_constraints=self.orientation_constraint)
+            if self.keep_orientation:
+                # Check all returned trajectory samples, not just the endpoint.
+                # MoveIt's path constraint also checks interpolated path states.
+                peak = 0.0
+                for point in plan.joint_trajectory.points:
+                    sample = copy.deepcopy(seed)
+                    values = dict(zip(sample.joint_state.name, sample.joint_state.position))
+                    values.update(zip(plan.joint_trajectory.joint_names, point.positions))
+                    sample.joint_state = JointState(name=list(values), position=list(values.values()))
+                    angle = self.orientation_error(self.forward(sample), baseline)
+                    peak = max(peak, angle)
+                if peak > self.angle_tolerance:
+                    raise RuntimeError(f'Planned tool orientation error {peak:.4f} rad exceeds tolerance.')
+                self.get_logger().info(f'Leg {index + 1} maximum sampled orientation error: {math.degrees(peak):.3f} degrees')
             seed = self.predicted_end(plan, seed)
             error = self.distance(self.xyz(self.forward(seed)), self.xyz(target))
             if error > self.tolerance:
@@ -210,7 +262,13 @@ class ToolSequence(Planner):
             self.execute_leg(plan)
             self.check_measured_state()
             measured = RobotState(joint_state=copy.deepcopy(self.state), is_diff=True)
-            error = self.distance(self.xyz(self.forward(measured)), self.xyz(target))
+            measured_pose = self.forward(measured)
+            if self.keep_orientation:
+                angle = self.orientation_error(measured_pose, baseline)
+                self.get_logger().info(f'Leg {index + 1} measured-state FK orientation error: {math.degrees(angle):.3f} degrees')
+                if angle > self.angle_tolerance:
+                    raise RuntimeError('Measured tool orientation error exceeds tolerance.')
+            error = self.distance(self.xyz(measured_pose), self.xyz(target))
             self.get_logger().info(f'Leg {index + 1} measured-state FK position error: {error * 1000:.2f} mm')
             if error > self.tolerance:
                 raise RuntimeError('Measured tool position error exceeds tolerance; remaining legs not executed.')

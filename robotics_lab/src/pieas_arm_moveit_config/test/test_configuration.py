@@ -156,3 +156,40 @@ def test_tool_ik_solution_bounds_and_joint_name_mapping():
             pass
         else:
             raise AssertionError('Invalid solver result accepted')
+
+
+
+def test_orientation_error_handles_equivalent_quaternions_and_known_rotations():
+    import math
+    from types import SimpleNamespace
+    tree = ast.parse((ROOT / 'scripts/tool_sequence').read_text())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'ToolSequence')
+    scope = dict(Planner=object, math=math)
+    exec(compile(ast.Module(body=[cls], type_ignores=[]), 'tool_sequence', 'exec'), scope)
+    error = scope['ToolSequence'].orientation_error
+
+    def pose(x, y, z, w):
+        return SimpleNamespace(pose=SimpleNamespace(orientation=SimpleNamespace(x=x, y=y, z=z, w=w)))
+
+    zero = pose(0, 0, 0, 1)
+    assert error(zero, pose(0, 0, 0, -1)) == 0
+    assert abs(error(zero, pose(0, 0, math.sin(0.1), math.cos(0.1))) - 0.2) < 1e-12
+    assert abs(error(zero, pose(0, 0, 2, 0)) - math.pi) < 1e-12
+    try:
+        error(zero, pose(0, 0, 0, 0))
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('Invalid quaternion accepted')
+
+
+def test_full_pose_group_uses_same_chain_and_full_pose_solver():
+    srdf = ET.parse(ROOT / 'config/pieas_arm.srdf').getroot()
+    a = srdf.find("group[@name='arm']/chain")
+    b = srdf.find("group[@name='arm_pose']/chain")
+    assert a.attrib == b.attrib
+    k = yaml.safe_load((ROOT / 'config/kinematics.yaml').read_text())
+    assert k['arm']['position_only_ik'] is True
+    assert k['arm_pose']['position_only_ik'] is False
+    ompl = yaml.safe_load((ROOT / 'config/ompl_planning.yaml').read_text())
+    assert ompl['arm_pose']['planner_configs'] == ompl['arm']['planner_configs']

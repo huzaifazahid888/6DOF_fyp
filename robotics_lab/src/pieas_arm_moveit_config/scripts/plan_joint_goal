@@ -146,13 +146,15 @@ class Planner(Node):
             raise RuntimeError('First-lesson target bounds: rail +/-0.02 m, angles +/-0.3 rad.')
         self.plan_targets(targets)
 
-    def plan_targets(self, targets, start_state=None, plan_only=None, precise=False):
+    def plan_targets(self, targets, start_state=None, plan_only=None, precise=False, group_name="arm", path_constraints=None):
         """Plan an explicit joint goal; other clients can supply a predicted start."""
         if not self.client.wait_for_server(timeout_sec=30):
             raise RuntimeError('MoveGroup action server unavailable.')
         goal = MoveGroup.Goal()
         request = goal.request
-        request.group_name = 'arm'
+        request.group_name = group_name
+        if path_constraints is not None:
+            request.path_constraints = path_constraints
         request.pipeline_id = 'ompl'
         request.planner_id = 'RRTConnectkConfigDefault'
         request.allowed_planning_time = 10.0
