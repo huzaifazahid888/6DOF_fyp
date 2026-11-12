@@ -60,6 +60,9 @@ export LANG=C.UTF-8 LC_ALL=C.UTF-8
 packages=(
     ca-certificates curl git python3 build-essential cmake
     python3-colcon-common-extensions python3-rosdep python3-yaml
+    python3-numpy python3-scipy python3-opencv
+    ros-jazzy-cv-bridge ros-jazzy-sensor-msgs-py ros-jazzy-ament-cmake-python
+    ros-jazzy-gz-sim-vendor ros-jazzy-gz-plugin-vendor ros-jazzy-gz-transport-vendor
     ros-jazzy-desktop ros-jazzy-ros-gz ros-jazzy-gz-ros2-control
     ros-jazzy-ros2-controllers ros-jazzy-controller-manager ros-jazzy-ros2controlcli
     ros-jazzy-robot-state-publisher ros-jazzy-tf2-ros

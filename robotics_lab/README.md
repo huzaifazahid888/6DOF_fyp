@@ -74,3 +74,12 @@ Four rotary effort limits are provisional. The slide range and source inertial v
 ## Asset provenance
 
 The arm comes from the original PIEAS project scene. The scene credits On Robot ApS for the RG2 gripper CAD. See the package README for conversion details. Third-party model rights remain with their respective owners; this repository does not grant a new license for those assets.
+
+## Conveyor sorting factory
+
+The sensor-driven factory is in [`src/pieas_sorting`](src/pieas_sorting/README.md).
+It adds one RGBD camera, one LiDAR, an indexed conveyor, six shape parts, three bins,
+perception, a task state machine and an explicitly modelled simulation suction tool.
+Start with its [walkthrough](src/pieas_sorting/docs/WALKTHROUGH.md) and
+[validation limits](src/pieas_sorting/docs/VALIDATION.md), then follow its build/run commands.
+The original arm lab and MoveIt lessons remain available.

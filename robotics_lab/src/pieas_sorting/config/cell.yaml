@@ -1,0 +1,49 @@
+# Metres and radians in the world frame. One source for Gazebo and MoveIt.
+belt:
+  x: 0.36
+  y_min: -1.15
+  y_max: 0.12
+  width: 0.09
+  top: 0.12
+  speed: 0.025
+  stop_y: 0.0
+parts:
+  count: 6
+  first_y: -0.12
+  spacing: 0.18
+  height: 0.03
+  cube_size: 0.03
+  rectangle_size: [0.05, 0.025]
+  cylinder_radius: 0.018
+bins:
+  cube: [0.20, -0.21, 0.0]
+  rectangle: [0.04, -0.21, 0.0]
+  cylinder: [-0.12, -0.21, 0.0]
+bin_inner: 0.12
+bin_wall: 0.008
+bin_floor: 0.03
+bin_height: 0.09
+camera:
+  xyz: [0.36, 0.0, 0.70]
+  rpy: [0.0, 1.5707963267948966, 0.0]
+  width: 640
+  height: 480
+  hfov: 0.80
+lidar:
+  xyz: [0.36, 0.0, 0.85]
+  rpy: [0.0, 1.5707963267948966, 0.0]
+perception:
+  roi_half_x: 0.035
+  roi_half_y: 0.045
+  minimum_height: 0.012
+  maximum_height: 0.060
+  lidar_height_tolerance: 0.012
+  minimum_lidar_points: 5
+  stable_frames: 4
+motion:
+  rail_limit: 0.16
+  clearance_z: 0.22
+  release_top_z: 0.16
+  endpoint_tolerance: 0.003
+  upright_tolerance: 0.12
+  max_cycles: 6

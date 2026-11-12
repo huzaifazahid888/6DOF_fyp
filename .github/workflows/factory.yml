@@ -1,0 +1,52 @@
+name: Factory Jazzy integration
+on:
+  push:
+    paths: ['robotics_lab/**', '.github/workflows/factory.yml']
+  pull_request:
+    paths: ['robotics_lab/**', '.github/workflows/factory.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  factory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+      - name: Install declared dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-pytest ros-jazzy-desktop ros-jazzy-moveit ros-jazzy-ros-gz ros-jazzy-gz-ros2-control ros-jazzy-ros2-controllers xvfb
+          if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then sudo rosdep init; fi
+          rosdep update --rosdistro jazzy
+          rosdep install --from-paths robotics_lab/src --ignore-src --rosdistro jazzy -y
+      - name: Build and test
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd robotics_lab
+          colcon build --symlink-install --event-handlers console_direct+
+          source install/setup.bash
+          colcon test --event-handlers console_direct+
+          colcon test-result --verbose
+      - name: Render sensors and execute one complete sorting cycle
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source robotics_lab/install/setup.bash
+          xvfb-run -a python3 robotics_lab/src/pieas_sorting/test/runtime_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: factory-test-logs
+          path: |
+            robotics_lab/log
+            /tmp/pieas_factory_launch.log
+            /tmp/pieas_factory_sort.log
+            /tmp/pieas_factory_batch

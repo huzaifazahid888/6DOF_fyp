@@ -14,9 +14,9 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 
-def prepare_world(package):
+def prepare_world(package, world_source=None, robot_source=None):
     # Both ROS and Gazebo use this description; no separate hand-edited SDF robot.
-    robot = ET.parse(package / 'urdf/pieas_control.urdf.in').getroot()
+    robot = ET.parse(robot_source or package / 'urdf/pieas_control.urdf.in').getroot()
     for parameter in robot.findall('./gazebo/plugin/parameters'):
         if parameter.text == '@CONTROLLERS_FILE@':
             parameter.text = str(package / 'config/controllers.yaml')
@@ -56,7 +56,7 @@ def prepare_world(package):
             if flag is None:
                 flag = ET.SubElement(entity, 'self_collide')
             flag.text = 'true'
-        world_tree = ET.parse(package / 'worlds/lab.sdf')
+        world_tree = ET.parse(world_source or package / 'worlds/lab.sdf')
         world = world_tree.getroot().find('world')
         if world is None or world.get('name') != 'lab':
             raise RuntimeError('Expected a world named lab.')
