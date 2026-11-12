@@ -107,3 +107,25 @@ def test_unreachable_target_does_not_produce_fake_solution():
     kin=Kinematics(robot_variant(SOURCE))
     assert list(kin.candidates([10,10,10],np.zeros(6),attempts=1))==[]
     with pytest.raises(ValueError):list(kin.candidates([float('nan'),0,0],np.zeros(6)))
+
+
+def test_task_rejects_corrupted_sensor_goals():
+    import copy
+    from pieas_sorting.task_logic import validate_detection
+    value=detect(*synthetic('cube'),CONFIG)[0][0]
+    validate_detection(value,CONFIG)
+    for key,bad in [('xyz',[float('nan'),0,.1]),('xyz',[.9,0,.1]),('shape','unknown'),
+                    ('top_z',.5),('size',[.03,.03,-.03]),('lidar_points',0),('confidence',.1)]:
+        corrupted=copy.deepcopy(value);corrupted[key]=bad
+        with pytest.raises(ValueError):validate_detection(corrupted,CONFIG)
+
+
+def test_drop_requires_stationary_independent_samples_in_correct_bin():
+    from pieas_sorting.task_logic import DropVerifier
+    v=DropVerifier([.2,-.21,0],.12,.03,.09,[.03,.03,.03],'cube')
+    assert not v.update([.2,-.21,.045],1.)
+    assert not v.update([.2,-.21,.045],1.) # repeated message is not evidence
+    assert not v.update([.2,-.21,.045],1.2)
+    assert v.update([.2,-.21,.045],1.5)
+    assert not v.update([.5,-.21,.045],1.6)
+    assert not v.update([.2,-.21,.15],1.7)

@@ -203,6 +203,7 @@ public:
         std::ostringstream s;
         s << std::setprecision(10) << "{\"sim_time\":" << now << ",\"running\":" << (running?"true":"false")
           << ",\"at_station\":" << (atStation?"true":"false") << ",\"held\":" << (held>=0?"true":"false")
+          << ",\"removed\":" << std::count_if(parts.begin(),parts.end(),[](const Part &p){return p.removedFromBelt;})
           << ",\"ack\":\"" << ack << "\",\"error\":\"" << error << "\",\"release_xyz\":";
         // Ground truth is for drop verification only, never perception or IK.
         if (lastReleased>=0)

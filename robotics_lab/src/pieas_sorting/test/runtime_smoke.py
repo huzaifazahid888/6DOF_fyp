@@ -33,3 +33,7 @@ with launch_log.open('w') as output:
         except subprocess.TimeoutExpired:
             os.killpg(process.pid,signal.SIGKILL);process.wait()
         print('Launch log:',launch_log,'Task log:',sort_log)
+        # Include diagnostics in the ordinary CI job log as well as artifacts.
+        for path in [launch_log,sort_log]:
+            if path.exists():
+                print('\n'+str(path)+'\n'+path.read_text(errors='replace')[-40000:])

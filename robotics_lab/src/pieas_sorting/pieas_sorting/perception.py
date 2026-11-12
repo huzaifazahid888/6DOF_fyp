@@ -3,6 +3,8 @@ import json
 import time
 import numpy as np
 import rclpy
+from pathlib import Path
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
@@ -21,7 +23,7 @@ def stamp(message):
 class Perception(Node):
     def __init__(self):
         super().__init__('factory_perception')
-        self.declare_parameter('config','')
+        self.declare_parameter('config',str(Path(get_package_share_directory('pieas_sorting'))/'config/cell.yaml'))
         self.c=load_config(self.get_parameter('config').value)
         self.bridge=CvBridge();self.rgb=None;self.depth=None;self.info=None;self.cloud=None
         self.last_rgb_stamp=-1.;self.last_warning=0.;self.last_cloud_stamp=-1.

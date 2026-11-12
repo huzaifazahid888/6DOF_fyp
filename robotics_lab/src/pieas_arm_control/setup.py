@@ -11,6 +11,7 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
+    tests_require=['pytest'],
     maintainer='Muhammad Huzaifa',
     maintainer_email='huzaifazahid888@gmail.com',
     description='Learning ROS 2 actions with the PIEAS simulated arm.',

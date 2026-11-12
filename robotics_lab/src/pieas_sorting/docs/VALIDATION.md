@@ -4,7 +4,7 @@
 
 - Pure Python tests exercise shape classification on synthetic RGBD images, metric projection, LiDAR disagreement rejection, unknown shape rejection, frame stability, world/collision geometry consistency, preservation of original joint transforms, reachable station/bin IK and unreachable-target rejection.
 - Existing MoveIt configuration tests are retained and run alongside the factory tests.
-- A separate offline mesh collision audit checks the suction-variant home pose, parking/pick poses and both drop positions for all three bins, using the actual arm collision meshes and cell box geometry. Its sampled endpoints are collision-free. This is not a continuous-path or physics validation; runtime MoveIt planning remains mandatory.
+- `test/mesh_audit.py` is a reproducible optional offline mesh collision audit (requires `trimesh` and `python-fcl`) that checks the suction-variant home pose, parking/pick poses and both drop positions for all three bins, using the actual arm collision meshes and cell box geometry. Its sampled endpoints are collision-free. This is not a continuous-path or physics validation; runtime MoveIt planning remains mandatory.
 - Python compilation and generated XML/YAML parsing are checked.
 - `.github/workflows/factory.yml` builds with ROS 2 Jazzy on Ubuntu 24.04, runs unit tests, then invokes `test/runtime_smoke.py`. The runtime test requires actual advancing RGB, depth, LiDAR and joint streams and requests one physical attach/carry/release cycle. Check the Actions result for the exact commit you pull; a workflow being present does not imply it passed.
 

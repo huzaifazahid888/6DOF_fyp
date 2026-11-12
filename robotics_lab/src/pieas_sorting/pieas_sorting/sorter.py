@@ -14,7 +14,7 @@ import time
 import uuid
 import numpy as np
 import rclpy
-from ament_index_python.packages import get_package_prefix
+from ament_index_python.packages import get_package_prefix,get_package_share_directory
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import (AttachedCollisionObject, CollisionObject, PlanningScene,
                              PlanningSceneComponents, AllowedCollisionEntry, RobotState)
@@ -26,6 +26,7 @@ from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Bool,String
 from .kinematics import Kinematics,JOINTS
 from .world import load_config,boxes
+from .task_logic import validate_detection,DropVerifier
 
 # The existing, tested ROS action/service client is still our execution backend.
 _script=Path(get_package_prefix('pieas_arm_moveit_config'))/'lib/pieas_arm_moveit_config/tool_sequence'
@@ -35,7 +36,7 @@ ToolSequence=runpy.run_path(str(_script))['ToolSequence']
 class Sorter(ToolSequence):
     def __init__(self):
         super().__init__()
-        self.declare_parameter('config','')
+        self.declare_parameter('config',str(Path(get_package_share_directory('pieas_sorting'))/'config/cell.yaml'))
         self.declare_parameter('cycles',6)
         self.declare_parameter('log_directory',str(Path.home()/'.ros/pieas_sorting'))
         self.c=load_config(self.get_parameter('config').value)
@@ -72,6 +73,7 @@ class Sorter(ToolSequence):
         raise RuntimeError('Timeout: '+description)
 
     def wait(self,future,seconds=30):
+        if self.executing and seconds==180:seconds=self.execution_timeout
         deadline=time.monotonic()+seconds
         while rclpy.ok() and not future.done() and time.monotonic()<deadline:
             rclpy.spin_once(self,timeout_sec=0.05)
@@ -86,6 +88,8 @@ class Sorter(ToolSequence):
 
     def execute_leg(self,trajectory):
         self.executing=True
+        duration=trajectory.joint_trajectory.points[-1].time_from_start
+        self.execution_timeout=max(180,5*(duration.sec+duration.nanosec*1e-9)+30)
         try:return super().execute_leg(trajectory)
         finally:self.executing=False
 
@@ -183,6 +187,7 @@ class Sorter(ToolSequence):
             values=self.detection['detections']
             age=self.get_clock().now().nanoseconds*1e-9-self.detection['stamp']
             if len(values)!=1 or not 0<=age<0.5:return False
+            validate_detection(values[0],self.c)
             selected.append(copy.deepcopy(values[0]));return True
         self.spin_until(fresh,20,'one stationary camera detection corroborated by LiDAR')
         return selected[0]
@@ -226,6 +231,7 @@ class Sorter(ToolSequence):
         count=self.get_parameter('cycles').value
         if not 1<=count<=min(self.c['motion']['max_cycles'],self.c['parts']['count']):raise RuntimeError('cycles must be 1..6.')
         self.spin_until(lambda:self.machine is not None,30,'Gazebo factory plugin and bridge')
+        if self.machine.get('removed',0)>0:raise RuntimeError('This batch already started; relaunch the factory before a new task.')
         if self.machine['held']:raise RuntimeError('A payload is already attached; relaunch the factory for a clean batch.')
         self.command('stop')
         response=self.service(GetParameters,'/robot_state_publisher/get_parameters',
@@ -275,14 +281,12 @@ class Sorter(ToolSequence):
             self.detach_scene(obj,[bx,by,release[2]-detected['size'][2]/2])
             self.move([bx,by,clearance],'RETRACT')
             settled=[]
+            verifier=DropVerifier(self.c['bins'][shape],self.c['bin_inner'],self.c['bin_floor'],
+                                  self.c['bin_height'],detected['size'],shape)
             def inside_bin():
-                xyz=self.machine.get('release_xyz') if self.machine else None
-                if xyz is None:return False
-                cx,cy,_=self.c['bins'][shape]
-                margin=math.hypot(*detected['size'][:2])/2 if shape!='cylinder' else max(detected['size'][:2])/2
-                if not (abs(xyz[0]-cx)<self.c['bin_inner']/2-margin and
-                        abs(xyz[1]-cy)<self.c['bin_inner']/2-margin and
-                        self.c['bin_floor']<=xyz[2]<self.c['bin_height']):return False
+                if self.machine is None or time.monotonic()-self.machine_wall>0.5:return False
+                xyz=self.machine.get('release_xyz')
+                if not verifier.update(xyz,self.machine['sim_time']):return False
                 settled.append(list(xyz));return True
             self.spin_until(inside_bin,8,'released object inside the intended bin')
             self.detach_scene(obj,settled[-1])
