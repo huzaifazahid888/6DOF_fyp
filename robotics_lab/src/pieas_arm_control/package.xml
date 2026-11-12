@@ -5,7 +5,6 @@
   <description>ROS 2 action-client lessons for the PIEAS arm simulation.</description>
   <maintainer email="huzaifazahid888@gmail.com">Muhammad Huzaifa</maintainer>
   <license>Apache-2.0</license>
-  <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>action_msgs</exec_depend>
   <exec_depend>builtin_interfaces</exec_depend>
