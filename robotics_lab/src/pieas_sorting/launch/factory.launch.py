@@ -24,7 +24,9 @@ def generate_launch_description():
     config_path=package/'config/cell.yaml';c=load_config(config_path)
     directory=Path(tempfile.mkdtemp(prefix='pieas_factory_'))
     (directory/'cell.sdf').write_text(build_world(c))
-    (directory/'suction.urdf').write_text(robot_variant(description_package/'urdf/pieas_control.urdf.in'))
+    #(directory/'suction.urdf').write_text(robot_variant(description_package/'urdf/pieas_control.urdf.in'))
+    # Use the original robot description without replacing the gripper.
+    (directory/'suction.urdf').write_text((description_package/'urdf/pieas_control.urdf.in').read_text())
     prepare=runpy.run_path(str(description_package/'launch/lab.launch.py'))['prepare_world']
     try:
         description,world_path,generated=prepare(description_package,directory/'cell.sdf',directory/'suction.urdf')
