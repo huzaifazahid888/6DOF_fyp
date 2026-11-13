@@ -20,3 +20,9 @@
 A useful diagnostic bundle is the factory launch terminal output, task terminal output, `ros2 control list_controllers`, one `/factory/state` message, one `/factory/detections` message and the batch CSV. The CI runtime test writes `/tmp/pieas_factory_launch.log` and `/tmp/pieas_factory_sort.log` and uploads them with test artifacts.
 
 Do not run the retired full-range sweep in this scene. Motion limits alone do not prevent self-collision.
+
+## Observed shutdown issue
+
+The tested Jazzy MoveIt 2.12.4 binary has emitted a segmentation fault inside `MoveItCpp` / `TrajectoryExecutionManager` destruction **after SIGINT during test teardown**. This was also present after the successful one-object test. The application does not suppress this log and does not claim clean shutdown validation. Related upstream reports are [MoveIt issue 1597](https://github.com/moveit/moveit2/issues/1597) and [Jazzy teardown issue 3721](https://github.com/moveit/moveit2/issues/3721); similarity of a stack trace does not establish the exact same root cause.
+
+Distinguish teardown from an execution failure: require the task's `COMPLETE` result and verified placement CSV before shutdown. A crash during motion is a failed run and must be investigated. This package does not patch the installed MoveIt binaries.
