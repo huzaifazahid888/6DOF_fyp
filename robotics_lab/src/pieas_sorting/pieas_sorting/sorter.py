@@ -18,7 +18,7 @@ import rclpy
 from ament_index_python.packages import get_package_prefix,get_package_share_directory
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import (AttachedCollisionObject, CollisionObject, PlanningScene,
-                             PlanningSceneComponents, AllowedCollisionEntry, RobotState)
+                             PlanningSceneComponents, AllowedCollisionEntry, RobotState, Constraints, JointConstraint)
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from rcl_interfaces.srv import GetParameters
 from rclpy.signals import SignalHandlerOptions
@@ -163,7 +163,13 @@ class Sorter(ToolSequence):
                 chosen=solution;break
         if chosen is None:raise RuntimeError(f'No bounded, upright, collision-free IK at {xyz}.')
         self.get_logger().info(f'IK {label}: rail metres, then radians = {np.round(chosen,5).tolist()}')
-        plan=self.plan_targets(chosen.tolist(),start_state=start,plan_only=True,precise=True)
+        # Restrict the entire path, not just the IK endpoint, to the usable rail.
+        envelope=Constraints(name='factory_rail_envelope')
+        envelope.joint_constraints=[JointConstraint(joint_name='joint_1',position=0.,
+            tolerance_above=self.c['motion']['rail_limit'],
+            tolerance_below=self.c['motion']['rail_limit'],weight=1.)]
+        plan=self.plan_targets(chosen.tolist(),start_state=start,plan_only=True,precise=True,
+                               path_constraints=envelope)
         rail_index=plan.joint_trajectory.joint_names.index('joint_1')
         if any(abs(point.positions[rail_index])>self.c['motion']['rail_limit']+1e-6 for point in plan.joint_trajectory.points):
             raise RuntimeError('Planned rail path exceeds the factory operating envelope.')
