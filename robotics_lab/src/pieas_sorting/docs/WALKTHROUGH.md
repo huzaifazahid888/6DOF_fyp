@@ -8,6 +8,24 @@ An indexed conveyor moves a batch of six physical parts. It brakes when its lead
 
 “Intelligent” here means geometric perception, sensor corroboration, decision logic and collision-aware manipulation. It is not a trained neural network, arbitrary-object recognition or reinforcement learning. The controlled object family is three known shapes with a common green surface. This is a complete integration exercise with explicitly bounded perception assumptions.
 
+The two sensor branches meet before motion is permitted:
+
+```mermaid
+flowchart TD
+    A[RGB and depth] --> B[Shape and world position]
+    C[LiDAR cloud] --> D[Height and presence check]
+    B --> E{Fresh and consistent?}
+    D --> E
+    E -->|No| F[Wait or report fault]
+    E -->|Yes| G[Choose matching bin]
+    G --> H[Upright endpoint IK]
+    H --> I[MoveIt collision check and path]
+    I --> J[Controller and Gazebo execution]
+    J --> K[Verify attachment and placement]
+```
+
+There are three different kinds of feedback here. Joint states tell us what the arm did. Sensor detections tell us what is on the belt. Machine status tells us whether the belt stopped and whether the simulation attachment exists. A successful command in one branch does not substitute for evidence from another.
+
 ## 2. The files and extensions
 
 A `.py` file is Python source. A `.cpp` file is compiled C++ source. A `.yaml` file contains configuration data, not an algorithm. `.sdf` describes a Gazebo world with models, physics and sensors. `.urdf` describes robot links, joints, visuals, collisions and inertias. `.srdf` supplies MoveIt-specific groups and permitted collision pairs. `.rviz` saves visualization settings. `package.xml` declares ROS dependencies; `CMakeLists.txt` tells colcon how to build and install the package.
@@ -116,7 +134,7 @@ Each bin has two separate drop positions. On the supplied batch, six cycles fill
 
 The part is initially a world collision object. Only contact with the suction link is permitted during pickup. After gripping it becomes an attached collision object, so MoveIt checks its swept volume along with the arm. Temporary part-to-belt contact is permitted only for initial lift and then revoked.
 
-After release the part becomes a world object again. The final position used to update the planning scene is simulator ground truth from the release verification channel. This is explicitly a simulation scoring/scene-maintenance mechanism, not camera perception. A deployed cell would use a bin sensor or a second view to verify placement.
+After release the part becomes a world object again. Once the tool has retracted and placement is verified, the temporary suction-contact permission is revoked; every robot link must avoid that placed part during later cycles. The final position used to update the planning scene is simulator ground truth from the release verification channel. This is explicitly a simulation scoring/scene-maintenance mechanism, not camera perception. A deployed cell would use a bin sensor or a second view to verify placement.
 
 World-to-world object collision is Gazebo's job. MoveIt checks the robot and its carried geometry against the scene; it is not the physics engine that makes released parts fall.
 

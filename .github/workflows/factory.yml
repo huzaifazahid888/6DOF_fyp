@@ -5,6 +5,9 @@ on:
   pull_request:
     paths: ['robotics_lab/**', '.github/workflows/factory.yml']
   workflow_dispatch:
+concurrency:
+  group: factory-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

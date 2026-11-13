@@ -309,6 +309,9 @@ class Sorter(ToolSequence):
                 settled.append(list(xyz));return True
             self.spin_until(inside_bin,8,'released object inside the intended bin')
             self.detach_scene(obj,settled[-1],remove_attachment=False)
+            # Pickup contact permission ends once the tool is clear and placement
+            # is verified. Later paths must avoid this part with every robot link.
+            self.allow_contact(obj.id,'rg2_link',False)
             self.placed[shape]+=1
             self.records.append({'cycle':cycle+1,'shape':shape,'confidence':detected['confidence'],
                                  'lidar_points':detected['lidar_points'],'wall_seconds':time.monotonic()-started,
