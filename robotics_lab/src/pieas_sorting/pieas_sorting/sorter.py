@@ -26,7 +26,7 @@ from rclpy.clock import Clock,ClockType
 from scipy.spatial.transform import Rotation
 from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Bool,String
-from .kinematics import Kinematics,JOINTS
+from .kinematics import Kinematics,JOINTS,canonical_positions
 from .world import load_config,boxes
 from .task_logic import validate_detection,DropVerifier
 
@@ -144,7 +144,9 @@ class Sorter(ToolSequence):
 
     def measured(self):
         self.check_measured_state()
-        return RobotState(joint_state=copy.deepcopy(self.state),is_diff=True)
+        state=copy.deepcopy(self.state)
+        state.position=canonical_positions(state.name,state.position,self.kinematics.continuous)
+        return RobotState(joint_state=state,is_diff=True)
 
     def move(self,xyz,label):
         self.phase_to(label)

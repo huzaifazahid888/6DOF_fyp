@@ -31,6 +31,7 @@ class Kinematics:
             self.chain.append((joint.get('name'), joint.get('type'), transform, axis))
             link = joint.find('parent').get('link')
         self.chain.reverse()
+        self.continuous = {name for name,kind,_,_ in self.chain if kind == 'continuous'}
         limits = [root.find(f"joint[@name='{name}']/limit") for name in JOINTS]
         # Additional factory operating envelope. These are not hardware ratings.
         self.lower = np.array([max(float(l.get('lower', '-3.14')), -rail_limit if i == 0 else -2.8)
@@ -75,3 +76,13 @@ class Kinematics:
                 continue
             seen.append(result.x)
             yield result.x
+
+
+def canonical_positions(names, positions, continuous):
+    """Represent continuous angles in [-pi, pi] without changing the pose.
+
+    Gazebo encoder coordinates can accumulate turns. MoveIt's planning start
+    adapter expects a canonical continuous-joint representation.
+    """
+    return [float(np.arctan2(np.sin(q),np.cos(q))) if name in continuous else float(q)
+            for name,q in zip(names,positions)]

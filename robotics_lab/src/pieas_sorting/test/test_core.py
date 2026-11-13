@@ -148,3 +148,15 @@ def test_ros_string_callbacks_read_fields_and_detect_clock_reset():
     assert node.detection['detections']==[] and node.detection_wall>0
     scope['machine_callback'](node,SimpleNamespace(data=json.dumps({'sim_time':1.})))
     assert node.reset_detected is True
+
+
+def test_continuous_encoder_turns_are_canonical_without_changing_fk():
+    from pieas_sorting.kinematics import canonical_positions,JOINTS
+    kin=Kinematics(robot_variant(SOURCE))
+    assert kin.continuous=={'joint_6'}
+    for turns in [-3,-1,1,4]:
+        q=np.array([.04,-2.,-.5,.85,-.39,-1.2+turns*2*np.pi])
+        normalized=canonical_positions(JOINTS,q,kin.continuous)
+        assert -np.pi<=normalized[-1]<=np.pi
+        assert np.allclose(normalized[:-1],q[:-1])
+        assert np.allclose(kin.forward(q),kin.forward(normalized),atol=1e-12)

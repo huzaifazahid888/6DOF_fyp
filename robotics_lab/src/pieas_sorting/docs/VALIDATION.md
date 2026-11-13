@@ -14,6 +14,8 @@ The development workspace does not itself contain ROS 2 or Gazebo. Offline check
 
 [Run 43281803114](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43281803114) passed on commit `1ac877c`: Ubuntu/Jazzy build, package tests, actual sensor streams, camera classification of a cube (77 supporting LiDAR points), pickup, transport, release and stationary placement verification. Reported measured-state FK endpoint errors were 0.11–0.58 mm. These are model-based simulation errors, not external metrology. That run tested one object. The workflow has subsequently been expanded to all six parts; check its result separately.
 
+[Run 43372619445](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43372619445) verified the cube and rectangular-block placements, then stopped at the cylinder retract with MoveIt's `CheckStartStateBounds` error. Continuous wrist feedback is now normalized to an equivalent angle in [-pi, pi] before constructing planning start states; a regression test verifies unchanged FK across multiple encoder turns. The full six-part batch is **not yet verified** until a subsequent runtime run passes.
+
 ## Operating assumptions
 
 The supplied six parts are isolated, green, flat-topped and upright; the classes are cube, rectangular block and cylinder. Their heights are around 30 mm. This classifier is not trained for arbitrary industrial objects, overlapping piles, transparent surfaces or unknown shapes. Green separates foreground; class does not come from colour or object identity.
