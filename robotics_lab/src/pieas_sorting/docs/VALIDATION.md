@@ -6,9 +6,13 @@
 - Existing MoveIt configuration tests are retained and run alongside the factory tests.
 - `test/mesh_audit.py` is a reproducible optional offline mesh collision audit (requires `trimesh` and `python-fcl`) that checks the suction-variant home pose, parking/pick poses and both drop positions for all three bins, using the actual arm collision meshes and cell box geometry. Its sampled endpoints are collision-free. This is not a continuous-path or physics validation; runtime MoveIt planning remains mandatory.
 - Python compilation and generated XML/YAML parsing are checked.
-- `.github/workflows/factory.yml` builds with ROS 2 Jazzy on Ubuntu 24.04, runs unit tests, then invokes `test/runtime_smoke.py`. The runtime test requires actual advancing RGB, depth, LiDAR and joint streams and requests one physical attach/carry/release cycle. Check the Actions result for the exact commit you pull; a workflow being present does not imply it passed.
+- `.github/workflows/factory.yml` builds with ROS 2 Jazzy on Ubuntu 24.04, runs unit tests, then invokes `test/runtime_smoke.py`. The runtime test requires actual advancing RGB, depth, LiDAR and joint streams and requires six physical attach/carry/release cycles and checks the CSV for two verified placements of each shape. Check the Actions result for the exact commit you pull; a workflow being present does not imply it passed.
 
 The development workspace does not itself contain ROS 2 or Gazebo. Offline checks must not be presented as proof that the complete Gazebo batch ran. The runtime workflow and commissioning commands are provided to verify that distinction explicitly.
+
+## Recorded runtime result
+
+[Run 43281803114](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43281803114) passed on commit `1ac877c`: Ubuntu/Jazzy build, package tests, actual sensor streams, camera classification of a cube (77 supporting LiDAR points), pickup, transport, release and stationary placement verification. Reported measured-state FK endpoint errors were 0.11–0.58 mm. These are model-based simulation errors, not external metrology. That run tested one object. The workflow has subsequently been expanded to all six parts; check its result separately.
 
 ## Operating assumptions
 

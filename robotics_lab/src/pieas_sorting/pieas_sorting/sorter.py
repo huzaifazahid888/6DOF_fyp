@@ -22,6 +22,7 @@ from moveit_msgs.msg import (AttachedCollisionObject, CollisionObject, PlanningS
 from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from rcl_interfaces.srv import GetParameters
 from rclpy.signals import SignalHandlerOptions
+from rclpy.clock import Clock,ClockType
 from scipy.spatial.transform import Rotation
 from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Bool,String
@@ -48,7 +49,7 @@ class Sorter(ToolSequence):
         self.status=self.create_publisher(String,'/factory/task_state',10)
         self.create_subscription(String,'/factory/state',self.machine_callback,10)
         self.create_subscription(String,'/factory/detections',self.detection_callback,10)
-        self.create_timer(0.2,lambda:self.heartbeats.publish(Bool(data=True)))
+        self.create_timer(0.2,lambda:self.heartbeats.publish(Bool(data=True)),clock=Clock(clock_type=ClockType.STEADY_TIME))
         self.placed={name:0 for name in self.c['bins']}
         self.scene_object=None;self.records=[]
 
@@ -163,6 +164,9 @@ class Sorter(ToolSequence):
         if chosen is None:raise RuntimeError(f'No bounded, upright, collision-free IK at {xyz}.')
         self.get_logger().info(f'IK {label}: rail metres, then radians = {np.round(chosen,5).tolist()}')
         plan=self.plan_targets(chosen.tolist(),start_state=start,plan_only=True,precise=True)
+        rail_index=plan.joint_trajectory.joint_names.index('joint_1')
+        if any(abs(point.positions[rail_index])>self.c['motion']['rail_limit']+1e-6 for point in plan.joint_trajectory.points):
+            raise RuntimeError('Planned rail path exceeds the factory operating envelope.')
         endpoint=self.predicted_end(plan,start)
         error=self.distance(self.xyz(self.forward(endpoint)),xyz)
         if error>self.c['motion']['endpoint_tolerance']:raise RuntimeError('Planned endpoint outside tolerance.')
