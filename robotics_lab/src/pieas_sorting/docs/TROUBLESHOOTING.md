@@ -1,4 +1,6 @@
-# Troubleshooting by stage
+# Factory troubleshooting
+
+[Package overview](../README.md) · [Operation](RUNNING.md)
 
 | Symptom | Meaning and next check |
 |---|---|
@@ -12,6 +14,9 @@
 | Belt stops and no pick starts | Inspect `/factory/detections` and `/factory/task_state`. The code intentionally waits for accepted sensor evidence. |
 | `No bounded, upright, collision-free IK` | Check target XYZ, current pose, bin layout and collision geometry. Do not disable self-collision as a workaround. |
 | MoveIt planning failure | Endpoint reachability does not guarantee a path. Inspect the MoveIt log and scene, particularly the payload and queued-parts keepout. |
+| `Measured endpoint outside tolerance` during descent | Compare requested and measured tool XYZ. The current original-gripper geometry is paired with suction pickup logic; contact or tracking must be investigated before changing tolerance. This error occurs before attachment. |
+| Source edit does not change the model | Compare `src/` with the package path from `ros2 pkg prefix --share pieas_sorting`, rebuild successfully and restart the launch. Reset does not reload edited source. |
+| Sensors have no visible bodies | Current camera and LiDAR are world-mounted sensor definitions without housing meshes. Point clouds and images are data displays, not physical sensor models. |
 | Suction tolerance failure | Tool may not be close enough, upright, or the part may still move. Inspect measured FK and detection top height. Do not enlarge attachment radius to conceal a frame error. |
 | `released object inside intended bin` timeout | The drop did not satisfy placement verification. Inspect the object in Gazebo; a successful trajectory alone does not count as a sort. |
 | A task fails while holding an object | The attachment is retained. Stop the launch and begin with a clean scene; automatic arbitrary release is not performed. |

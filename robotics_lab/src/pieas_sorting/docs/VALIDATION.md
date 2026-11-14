@@ -1,4 +1,6 @@
-# Validation and explicit limits
+# Factory validation and limits
+
+[Package overview](../README.md) · [Project experiment log](../../../EXPERIMENTS.md)
 
 ## Checks performed during development
 
@@ -6,15 +8,21 @@
 - Existing MoveIt configuration tests are retained and run alongside the factory tests.
 - `test/mesh_audit.py` is a reproducible optional offline mesh collision audit (requires `trimesh` and `python-fcl`) that checks the suction-variant home pose, parking/pick poses and both drop positions for all three bins, using the actual arm collision meshes and cell box geometry. Its sampled endpoints are collision-free. This is not a continuous-path or physics validation; runtime MoveIt planning remains mandatory.
 - Python compilation and generated XML/YAML parsing are checked.
-- `.github/workflows/factory.yml` builds with ROS 2 Jazzy on Ubuntu 24.04, runs unit tests, then invokes `test/runtime_smoke.py`. The runtime test requires actual advancing RGB, depth, LiDAR and joint streams and requires six physical attach/carry/release cycles and checks the CSV for two verified placements of each shape. Check the Actions result for the exact commit you pull; a workflow being present does not imply it passed.
+- `.github/workflows/factory.yml` builds with ROS 2 Jazzy on Ubuntu 24.04, runs unit tests, then invokes `test/runtime_smoke.py`. The runtime test requires actual advancing RGB, depth, LiDAR and joint streams and requires six physical attach/carry/release cycles and checks the CSV for two verified placements of each shape. The Actions result must be checked for the exact revision; a workflow being present does not imply it passed.
 
-The development workspace does not itself contain ROS 2 or Gazebo. Offline checks must not be presented as proof that the complete Gazebo batch ran. The runtime workflow and commissioning commands are provided to verify that distinction explicitly.
+Offline checks, CI runs and local Gazebo runs provide different evidence. A passing geometry test does not establish successful sensor delivery or physical contact during a batch. Runtime evidence must identify the tool configuration as well as the code revision.
 
 ## Recorded runtime result
 
 [Run 43281803114](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43281803114) passed on commit `1ac877c`: Ubuntu/Jazzy build, package tests, actual sensor streams, camera classification of a cube (77 supporting LiDAR points), pickup, transport, release and stationary placement verification. Reported measured-state FK endpoint errors were 0.11–0.58 mm. These are model-based simulation errors, not external metrology. That run tested one object. The workflow has subsequently been expanded to all six parts; check its result separately.
 
-[Run 43372619445](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43372619445) verified the cube and rectangular-block placements, then stopped at the cylinder retract with MoveIt's `CheckStartStateBounds` error. Continuous wrist feedback is now normalized to an equivalent angle in [-pi, pi] before constructing planning start states; a regression test verifies unchanged FK across multiple encoder turns. The full six-part batch is **not yet verified** until a subsequent runtime run passes.
+[Run 43372619445](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/43372619445) verified the cube and rectangular-block placements, then stopped at the cylinder retract with MoveIt's `CheckStartStateBounds` error. Continuous wrist feedback is now normalized to an equivalent angle in [-pi, pi] before constructing planning start states; a regression test verifies unchanged FK across multiple encoder turns. This run did not verify a full six-part batch. A later local result is recorded below; it does not change the outcome of this historical CI run.
+
+## Local six-part result and later tool change
+
+On 13 November 2026, a local Gazebo run completed six placements, two for each shape, and ended with `FACTORY: COMPLETE`. Its reported CSV was `batch_20261113_105610.csv`. The terminal log showed six batch records and no task exception. The log and CSV are not committed as repository artifacts, and the exact local commit was not recorded, so this is a reported local result rather than a reproducible CI result for the current head.
+
+That run used the suction variant. The current main-branch launch was subsequently changed to read the original rigid gripper. The sorter and attachment backend retain suction assumptions. An observed `DESCEND_TO_PICK` failure after that change reported `Measured endpoint outside tolerance`; the traceback alone does not identify whether contact, tracking or another cause produced the error. Successful suction sorting does not validate this new tool configuration.
 
 ## Operating assumptions
 
@@ -24,7 +32,7 @@ The fixed overhead RGBD camera supplies aligned RGB and depth; LiDAR confirms he
 
 The belt stops for each pick. The traction model applies bounded forces to objects on a low-friction deck. It is an approximation of an indexed conveyor, not roller mechanics or moving-target interception.
 
-The RG2 geometry in the factory is replaced by a simulation suction tool. A proximity-gated fixed physics joint approximates attachment. Vacuum pressure, seal leakage, finger contact and a holding-force limit are not modelled. A detached object still falls and collides normally. This tool must not be described as a validated hardware gripper.
+In the tested suction configuration, the RG2 geometry is replaced by a simulation suction tool. A proximity-gated fixed physics joint approximates attachment. Vacuum pressure, seal leakage, finger contact and a holding-force limit are not modelled. A detached object still falls and collides normally. This tool must not be described as a validated hardware gripper.
 
 Numerical upright IK is separate from MoveIt collision validation. The factory rail envelope is ±0.16 m, an operating restriction selected for this scene, not a measured mechanical rating. Velocity/acceleration and effort settings are inherited simulation settings. Full motor/gearbox thermal and torque feasibility is not established.
 
@@ -34,7 +42,9 @@ Simulator ground truth is used for indexing, suction proximity checks and releas
 
 Each bin has two drop slots. Start a fresh launch for a new batch or after a fault. Do not run RViz Execute or another motion client during an automatic cycle. Resetting Gazebo during a task invalidates its scene/state bookkeeping; relaunch both task and world.
 
-## Acceptance procedure
+## Suction-baseline acceptance procedure
+
+This procedure applies to a compatible suction description and task. It does not validate the current original-gripper adaptation.
 
 1. Build and pass the unit tests.
 2. Launch the idle factory and run `check_cell` until it reports advancing sensors and joint feedback.

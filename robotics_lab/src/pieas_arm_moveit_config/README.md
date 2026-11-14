@@ -1,287 +1,61 @@
-# MoveIt milestone 1: check geometry, then plan and execute
+# Stage 3: MoveIt planning and tool movement
 
-MoveIt plans collision-checked joint motion. Gazebo simulates contact and dynamics;
-ros2_control executes the timed joint trajectory. Adding MoveIt does not calibrate
-masses, inertias, actuator torque, collision shapes or mechanical end stops.
+[Workspace overview](../../README.md) · [Previous: joint control](../pieas_arm_control/README.md) · [Next: factory sorting](../pieas_sorting/README.md)
 
-The previous full-range sweep produced observed link penetration and is retired.
-The launch now explicitly enables model and link self-collision in the generated
-SDF. SDFormat excludes directly joint-connected links from self-contact. Existing
-mesh collisions remain unchanged; their representation in the physics engine
-must still be inspected, particularly around concave rail and arm geometry.
+I added MoveIt after the direct joint sweep exposed collisions. The aim was to express a target, check whether the robot could reach it without intersecting the modelled scene, and execute a timed trajectory through the existing arm controller.
 
-## 1. Install and rebuild
+Gazebo handles simulated dynamics and contact. MoveIt handles the planning model and motion planning. RViz displays measured state, target poses and trajectory previews. The same six joints and trajectory controller connect these parts.
 
-Stop the previous Gazebo launch. In a terminal outside Conda/virtualenv:
+## Experiments in this package
 
-```bash
-cd ~/6DOF_fyp
-git pull --ff-only
-cd robotics_lab
-bash scripts/setup_ubuntu.sh --with-moveit --yes --build
-```
+| Experiment | Purpose | Implementation |
+| --- | --- | --- |
+| Small joint goal | Validate the measured start state, plan a modest joint change, preview and execute | [plan_joint_goal](scripts/plan_joint_goal) |
+| Obstacle avoidance | Represent a box in the planning scene and observe a detour or planning rejection | RViz MotionPlanning panel and the planning scene |
+| Tool XYZ sequence | Request a lift, sideways move and return; let IK find the joints | [tool_sequence](scripts/tool_sequence) |
+| Orientation constraint | Preserve the initial tool orientation while planning the task | `keep_orientation` option in `tool_sequence` |
 
-The setup script installs missing packages and uses rosdep for workspace
-requirements. If dependencies are already installed, rebuild with:
+A box added in RViz is not automatically created in Gazebo. Likewise, an object visible in Gazebo is not automatically included in MoveIt's scene. The factory stage later generates shared static geometry to reduce this mismatch.
+
+## Launch and first preview
+
+After the [workspace setup](../../START_HERE.md):
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-colcon build --symlink-install
-source install/setup.bash
-```
-
-## 2. Launch Gazebo, MoveIt and RViz together
-
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/6DOF_fyp/robotics_lab/install/setup.bash
 ros2 launch pieas_arm_moveit_config planning.launch.py
 ```
 
-Do not also launch the old lab in a second terminal: this launch includes it.
-It starts the real Gazebo controllers, not a fake robot. No motion is commanded.
-The scene setup node adds the z=0 lab ground to MoveIt's planning scene. Only
-base_link-to-ground contact is allowed, because that base is fixed to the ground.
-Wait for `Planning scene ready` before using RViz planning controls.
-
-Confirm Self Collide is on in Gazebo. If the robot shakes or jumps immediately,
-pause it: this can expose overlapping collision geometry previously hidden by
-self-collision being off. Do not solve that by disabling all collision checks.
-
-## 3. Validate current state and preview a small plan
-
-In a second terminal:
+This includes Gazebo, MoveIt, RViz and the controllers. In another sourced terminal:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source ~/6DOF_fyp/robotics_lab/install/setup.bash
 ros2 run pieas_arm_moveit_config plan_joint_goal --ros-args -p use_sim_time:=true
 ```
 
-This checks fresh advancing joint feedback, refuses a moving robot, asks MoveIt
-whether the measured pose is valid, and reports colliding link pairs if invalid.
-It then plans a small six-joint goal with OMPL RRTConnect. It does NOT move Gazebo.
-RViz previews the planned trajectory through the MotionPlanning display. Select
-planning group `arm` if needed. The target is rail +10 mm and small rotary angles.
-The first-lesson client restricts targets to +/-20 mm rail and +/-0.3 rad angles.
-These are teaching restrictions, not validated mechanical limits.
+The default is planning only. Execution uses the same command with `-p execute:=true` and plans again from the current state. The [experiment guide](docs/EXPERIMENTS.md) contains the full commands, home target, XYZ offsets, RViz checks and orientation mode.
 
-The planner checks the URDF collision meshes and the ground represented in its
-scene. It does not automatically know about newly inserted Gazebo objects or
-sensor observations. The supplied SRDF excludes only directly adjacent pairs;
-no non-adjacent contacts are silently ignored because they occur at home.
+## How the tool task works
 
-If the check fails, send the reported contact pairs and the move_group error.
-Fix mesh/frame/joint-limit errors or choose a valid starting pose before executing.
-A refusal is useful diagnostic evidence; it is not a reason to bypass checking.
+`tool_sequence` reads the current joints, asks for forward kinematics, and constructs tool targets relative to the starting position. KDL inverse kinematics provides candidate joint positions. MoveIt checks validity and plans paths; time parameterization sets the trajectory timing. The controller executes the accepted trajectories, then measured joint feedback is converted through FK to check the final tool position.
 
-## 4. Execute only after the preview is sensible
+The default task plans all three legs before executing them. Its connecting paths are joint-space plans, not guaranteed straight Cartesian lines. Position-only IK leaves tool orientation free. The optional orientation mode adds a path constraint and has a more restricted reachable set.
 
-```bash
-ros2 run pieas_arm_moveit_config plan_joint_goal --ros-args -p use_sim_time:=true -p execute:=true
-```
+## Configuration map
 
-This repeats validation and plans afresh from the current state before execution.
-MoveIt sends the result to the existing `/arm_controller/follow_joint_trajectory`
-action. Do not run any old trajectory client at the same time.
+| File | Purpose |
+| --- | --- |
+| [pieas_arm.srdf](config/pieas_arm.srdf) | Planning groups, named states and adjacent collision exclusions |
+| [kinematics.yaml](config/kinematics.yaml) | KDL solver settings for position and full-pose groups |
+| [ompl_planning.yaml](config/ompl_planning.yaml) | Planner and request settings |
+| [joint_limits.yaml](config/joint_limits.yaml) | Planning velocity and acceleration limits |
+| [moveit_controllers.yaml](config/moveit_controllers.yaml) | Connection to the existing trajectory action |
+| [planning.rviz](config/planning.rviz) | Saved displays and planning panel |
+| [planning.launch.py](launch/planning.launch.py) | Starts the integrated system |
+| [test_configuration.py](test/test_configuration.py) | Configuration and application checks |
 
-To plan a return home first, then execute it, use respectively:
+## Observed results and limits
 
-```bash
-ros2 run pieas_arm_moveit_config plan_joint_goal --ros-args -p use_sim_time:=true -p target:="[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"
-ros2 run pieas_arm_moveit_config plan_joint_goal --ros-args -p use_sim_time:=true -p execute:=true -p target:="[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"
-```
+Small joint goals, obstacle-scene experiments and the default XYZ task were exercised locally. One executed XYZ sequence reported endpoint errors of 0.36, 0.76 and 0.74 mm. These values come from measured joints and the same robot model used for planning; they are not independent physical accuracy measurements.
 
-Ctrl+C requests cancellation. If cancellation is unconfirmed, pause Gazebo.
-Do not reset the simulation clock while a motion is active.
+Orientation-mode checks recorded so far are offline configuration and numerical checks. That mode still needs its own runtime results. The original gripper fingers remain fixed throughout these arm-motion experiments.
 
-## What each component teaches
-
-| Component | Responsibility |
-|---|---|
-| URDF | Links, joint frames, collision meshes, mass and inertia |
-| SRDF | Six-joint planning group, named poses, adjacent collision exclusions |
-| OMPL RRTConnect | Search for a joint-space path around modeled collisions |
-| Time parameterization | Add timing using velocity and acceleration limits |
-| MoveIt controller connection | Send the planned trajectory to arm_controller |
-| ros2_control + Gazebo | Execute motion and report simulated joint feedback |
-| RViz | Inspect the planning model and proposed trajectory |
-
-`config/joint_limits.yaml` deliberately uses conservative planning speeds and
-assumed acceleration limits; the example applies 10% speed/acceleration scaling.
-The 30-second requirement is retired for this milestone. Plan duration comes from
-the path and limits. Speed does not take priority over finding a valid path.
-
-The first milestone uses joint-space planning. The XYZ milestone below adds
-position-only IK. Arbitrary tool orientation is not constrained. Gripper fingers
-remain fixed.
-
-## Next milestones and acceptance criteria
-
-1. Current-state validation passes at home; collision geometry and rail travel
-   are reviewed; the robot holds still with self-collision enabled.
-2. Preview, execute and return home succeed without penetrating links or ground.
-3. Add the same obstacle in Gazebo and MoveIt's scene; show a detour or rejection.
-4. Validate forward kinematics and an IK solver, then command reachable tool poses.
-5. Add depth/LiDAR observations to update the planning scene and replan.
-
-Offline checks verify Python/XML/YAML syntax, joint/controller consistency,
-conservative planning speeds, and adjacent-only collision exclusions. The
-integration still requires a ROS 2 Jazzy/Gazebo run on the target machine.
-
-References:
-- https://moveit.picknik.ai/main/doc/examples/urdf_srdf/urdf_srdf_tutorial.html
-- https://moveit.picknik.ai/main/doc/examples/controller_configuration/controller_configuration_tutorial.html
-- https://moveit.picknik.ai/main/doc/examples/ompl_interface/ompl_interface_tutorial.html
-- https://sdformat.org/spec/1.7/model/
-
-
-# Milestone 2: program the tool in XYZ coordinates
-
-`tool_sequence` requests three world-coordinate targets for the saved `tool0`
-frame: 30 mm up, then 30 mm sideways at the raised height, then the original
-joint configuration. This is a task expressed with tool coordinates; IK chooses
-the joints and OMPL chooses collision-checked joint-space paths between them.
-The connecting paths are not constrained to be Cartesian straight lines.
-
-## Update and run
-
-Stop the integrated launch, then:
-
-```bash
-cd ~/6DOF_fyp
-git pull --ff-only
-cd robotics_lab
-source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src --rosdistro jazzy -y
-colcon build --symlink-install --packages-select pieas_arm_moveit_config
-source install/setup.bash
-ros2 launch pieas_arm_moveit_config planning.launch.py
-```
-
-In a second terminal, preview the complete task:
-
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/6DOF_fyp/robotics_lab/install/setup.bash
-ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true
-```
-
-After the three plans pass and the preview is sensible, execute:
-
-```bash
-ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p execute:=true
-```
-
-Each invocation plans afresh. Within the execution invocation, all three legs
-must plan successfully BEFORE any motion. Those exact trajectories are then
-executed in order, not independently replanned after each movement. Changed
-starting joints cause refusal. Keep the scene static and use only one motion
-client during the task. Execution uses the existing arm_controller. Ctrl+C
-requests cancellation; pause Gazebo if cancellation is not confirmed.
-
-The console prints starting XYZ, each target, planned endpoint error, and the
-FK position error calculated from measured joint feedback after each execution.
-Default maximum tool-position error is 3 mm. That error measures consistency
-with the same URDF; it is not independent calibration of physical tool placement.
-
-If the existing cube obstructs a goal or path, the task may refuse. IK failure
-is distinct from path-planning failure. Read the reported leg and error code;
-do not disable collision checks. Restore the cube separately in both scenes
-if you restart a world where it was inserted only at runtime.
-
-## Change the task coordinates
-
-Offsets are in WORLD axes from the original measured tool position. Values are
-metres. Both lists contain X, Y, Z; the second is not added to the first.
-For example, lift 40 mm, then move 20 mm along world Y at that height:
-
-```bash
-ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p lift:="[0.0, 0.0, 0.04]" -p across:="[0.0, 0.02, 0.04]"
-```
-
-Preview is the default. Add `-p execute:=true` to plan and execute the changed
-task. Offsets are initially limited to 100 mm in Euclidean distance from the
-starting position. Reachability and collision checking can further restrict them.
-
-## Files involved
-
-- `config/pieas_arm.srdf`: defines the same six-joint arm as a serial chain from
-  base_link to tool0, so a chain IK plugin can operate on it.
-- `config/kinematics.yaml`: loads KDL with `position_only_ik: true`. Tool orientation
-  may change. It is not a fixed-downward gripper task.
-- `launch/planning.launch.py`: passes kinematics settings to move_group and RViz.
-- `scripts/tool_sequence`: commented application logic using FK, collision-aware
-  IK, planning and execution services/actions. The saved tool0 location is inherited
-  from the original conversion, not claimed to be physically calibrated.
-- `scripts/plan_joint_goal`: exposes its existing planning connection for reuse;
-  the original small joint-goal command remains available.
-
-Target markers are published on `/tool_targets`; a MarkerArray display is added
-to the RViz preset. Green is the lifted target, blue the sideways target, orange
-the original position. The actual commanded working frame can be inspected in
-RViz by adding a TF display and locating `tool0` relative to the gripper fingers.
-The existing converted frame is used without changing mesh or tool offsets.
-
-Offline validation checked chain continuity and joint membership, configuration
-syntax, returned-IK joint bounds, Python client initialization, and numerical XYZ
-reachability for the default targets at home and small_test. Actual KDL/plugin
-loading, collision-valid IK, visualization and execution need the target Jazzy
-machine. Neither arbitrary reachable orientation nor collision-free success from
-all starting poses is claimed.
-
-
-# Milestone 3: preserve tool orientation during motion
-
-The optional orientation mode uses the same tool_sequence program:
-
-```bash
-ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p keep_orientation:=true
-```
-
-After a successful preview, plan afresh and execute with:
-
-```bash
-ros2 run pieas_arm_moveit_config tool_sequence --ros-args -p use_sim_time:=true -p keep_orientation:=true -p execute:=true
-```
-
-Stop the launch, pull, rebuild this package, and restart planning.launch.py before
-using this mode. The new arm_pose group must be loaded by move_group and RViz.
-No additional package installation is needed after the XYZ milestone.
-
-This mode preserves the INITIAL measured tool quaternion relative to world. It
-is appropriate for maintaining a downward gripper only when that initial pose
-already points the physical gripper downward. It does not automatically rotate
-a tilted starting gripper downward. The saved tool0 frame's local positive Z
-points approximately UP at home; do not assume positive tool Z is the gripper's
-approach direction. The visible gripper geometry and saved frame need calibration
-before real hardware use.
-
-Defaults in this mode: lift 20 mm along world Z, move 20 mm along world X at the
-raised height, then return to the original joint configuration. Unlike the free
-orientation task, the sideways leg uses X; XYZ motions with fixed orientation
-have more restrictive reachability near the singular home configuration.
-Offsets can be changed through the existing lift/across parameters.
-
-Files and responsibilities:
-
-- SRDF: adds arm_pose, a second planning group with the SAME six physical joints.
-- kinematics.yaml: arm retains position-only KDL; arm_pose uses full-pose KDL.
-- ompl_planning.yaml: provides the planner settings for arm_pose.
-- tool_sequence: requests full-pose IK and supplies an orientation PATH constraint
-  to every plan, including return. Endpoint-only orientation would be insufficient.
-- plan_joint_goal: accepts a planning group and optional path constraint for reuse.
-
-Default maximum total orientation error is 0.05 rad (about 2.86 degrees). Each
-rotation-vector component is constrained to that value divided by sqrt(3).
-The program checks FK orientation at every returned trajectory waypoint before
-executing any leg, reports maximum sampled angular errors, and checks measured
-joint-state FK orientation after each leg. MoveIt's path checking is discrete;
-these checks are not a proof of continuous physical orientation accuracy. The
-controller and actual dynamics can introduce additional error during execution.
-If collision/IK/path checks fail, the program does not remove the constraint or
-silently fall back to free orientation. Keep the environment static while executing.
-
-Validation here includes offline configuration tests, quaternion error tests, and
-numerical full-pose reachability examples. KDL convergence, constrained planning,
-and execution require validation on the target ROS/Gazebo installation.
+[Detailed experiments](docs/EXPERIMENTS.md) · [Project results](../../EXPERIMENTS.md).

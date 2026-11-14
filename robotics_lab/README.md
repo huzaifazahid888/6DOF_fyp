@@ -1,85 +1,62 @@
-## Current milestone: MoveIt collision-aware planning
-
-The full-range direct trajectory demo is retired after observed link penetration.
-See [MoveIt setup and first experiment](src/pieas_arm_moveit_config/README.md).
-The integrated launch enables Gazebo self-collision and connects MoveIt to the
-existing controller. Start with state validation and plan-only preview.
-
 # PIEAS Arm Robotics Lab
 
-A ROS 2 and Gazebo learning and research project built around the six-DOF arm from my bachelor's project at PIEAS. The goal is to progress from controlled joint motion to perception, collision avoidance, and autonomous manipulation.
+[Project overview](../README.md) · [Setup](START_HERE.md) · [Code guide](docs/CODE_GUIDE.md) · [Results](EXPERIMENTS.md) · [Roadmap](docs/ROADMAP.md)
 
-![Offline rendering of the extracted arm](docs/arm_preview.png)
+I built this workspace to extend my bachelor's arm project from embedded joint control into perception and motion planning. The work developed in four stages, with a separate ROS package for each responsibility.
 
-The preview is an offline mesh rendering. Gazebo runtime validation is the next milestone.
+![Offline rendering of the extracted arm geometry](docs/arm_preview.png)
+
+This image is an offline model rendering. Runtime observations are recorded separately in the experiment log.
+
+## 1. Robot description and simulation
+
+The first step was recovering the arm from the original CoppeliaSim/V-REP scene. This produced the meshes, joint transforms and robot description. The Gazebo launch adds the controller interfaces and assembles the robot into the startup world so a world reset does not simply remove a model spawned later.
+
+Package: [pieas_arm_description](src/pieas_arm_description/README.md).
+
+## 2. Joint commands and feedback
+
+The next step was sending timed joint goals and checking the resulting position feedback. This established how the action client, trajectory controller and Gazebo connect. A later full-range sweep exposed an important limitation: joint limits alone do not prevent links from colliding. That sweep is retired and its executable refuses motion.
+
+Package: [pieas_arm_control](src/pieas_arm_control/README.md).
+
+## 3. Collision-aware motion and tool targets
+
+MoveIt adds the planning scene, inverse kinematics and collision-checked paths. RViz shows the robot state and planned motion; Gazebo executes the trajectory through the existing controller. The experiments progress from a small joint goal to obstacle avoidance and a tool task that lifts, moves sideways and returns. An optional orientation-constrained mode is also implemented, with its validation status documented separately.
+
+Package: [pieas_arm_moveit_config](src/pieas_arm_moveit_config/README.md).
+
+## 4. Perception and factory sorting
+
+The factory connects an indexed conveyor, RGB-D camera, LiDAR, shape classification, numerical IK and a sorting state machine. A suction-based simulation batch completed six placements, two per shape. This provided an end-to-end baseline for studying perception and manipulation together.
+
+Package: [pieas_sorting](src/pieas_sorting/README.md).
 
 ## Current status
 
-| Component | Status |
+| Capability | Status |
 | --- | --- |
-| URDF and eight STL meshes | Extracted, with offline kinematic checks |
-| Six arm joints | One sliding joint and five rotary joints |
-| ROS 2 control and trajectory controller | Configuration prepared, runtime verification pending |
-| Overhead RGB-D camera and 3D LiDAR | World and bridge prepared, runtime verification pending |
-| RG2 gripper | Fixed at its saved pose, actuation planned |
-| MoveIt planning and perception integration | Planned |
-| Autonomous grasping and recovery | Planned |
+| Model import, controllers and basic motion | Exercised in the local Gazebo setup |
+| MoveIt joint goals and XYZ tool sequence | Planned and executed locally |
+| Orientation-constrained tool sequence | Implemented; recorded checks are offline |
+| Six-object suction sorting | Completed in a reported local run; historical CI results are linked in the factory validation notes |
+| Factory with restored original gripper | Current launch configuration; original finger grasping is not implemented |
+| Selectable suction/original tools | Planned; no `gripper_type` launch argument yet |
+| Camera and LiDAR | Fixed overhead sensors in the factory; robot mounting is planned |
+| Dynamic obstacles, recovery and broader object recognition | Future experiments |
 
-## Get started
+## Setup and reading order
 
-Target environment is Ubuntu 24.04, ROS 2 Jazzy, and Gazebo Harmonic.
+The supported setup is Ubuntu 24.04, ROS 2 Jazzy and Gazebo Harmonic. [START_HERE.md](START_HERE.md) contains installation, environment setup and a launch choice for each stage. One integrated launch runs at a time.
 
-Clone the repository and enter this workspace:
+The package READMEs explain purpose, current behaviour and important files. Longer implementation details are linked from those pages. [CODE_GUIDE.md](docs/CODE_GUIDE.md) is the reading order for tracing the system from launch to sensor processing and motion execution.
 
-```bash
-git clone https://github.com/huzaifazahid888/6DOF_fyp.git
-cd 6DOF_fyp/robotics_lab
-```
+## Modelling limits
 
-Follow [START_HERE.md](START_HERE.md) for dependencies, build commands, first motion, sensor checks, troubleshooting, and the full experimental roadmap.
+The arm has one prismatic joint and five rotary joints. Source travel, mass, inertia and actuator limits are simulation inputs that still need mechanical validation. Position-interface motion and low model-based FK errors do not establish real motor torque, payload capacity or physical placement accuracy.
 
-## Project files
-
-| Path | Purpose |
-| --- | --- |
-| START_HERE.md | Setup guide and staged research plan |
-| src/pieas_arm_description/urdf | Baseline robot and controller-enabled template |
-| src/pieas_arm_description/meshes | Extracted arm and gripper geometry |
-| src/pieas_arm_description/config | Controllers and sensor bridge |
-| src/pieas_arm_description/launch | Combined simulation launch |
-| src/pieas_arm_description/worlds | Gazebo environment and sensor rigs |
-| EXPERIMENTS.md | Record settings, outcomes, and reproducible steps |
-
-## Milestones
-
-- [x] Recover the arm geometry and kinematic chain from the V-REP scene.
-- [x] Prepare ROS 2 control, sensor world, and launch configuration.
-- [ ] Validate Gazebo startup, all joints, and sensor coordinate frames.
-- [ ] Integrate MoveIt and verify IK and collision checking.
-- [ ] Compare path planners and trajectory generation methods.
-- [ ] Estimate object pose using RGB-D data.
-- [ ] Build obstacle maps using depth and LiDAR measurements.
-- [ ] Implement gripper actuation and physical grasp tests.
-- [ ] Complete vision-guided pick-and-place.
-- [ ] Add dynamic-obstacle handling and recovery.
-- [ ] Evaluate additional sensing and learning-based methods.
-- [ ] Publish repeatable benchmark results and a demonstration.
-
-## Development and validation
-
-Build from robotics_lab with colcon. Keep build/, install/, log/, and large experiment recordings out of Git. Record each successful runtime milestone in EXPERIMENTS.md, including the tested commit and software versions. Use a separate branch for each feature and a pull request describing the change and its validation.
-
-Four rotary effort limits are provisional. The slide range and source inertial values require validation. The current position interface supports integration experiments; detailed actuator and payload studies require further modeling.
+The original gripper is one rigid link. The tested factory used a fixed-joint suction approximation. Neither is a validated friction-based finger grasp. The current gripper work is described in the [roadmap](docs/ROADMAP.md).
 
 ## Asset provenance
 
-The arm comes from the original PIEAS project scene. The scene credits On Robot ApS for the RG2 gripper CAD. See the package README for conversion details. Third-party model rights remain with their respective owners; this repository does not grant a new license for those assets.
-
-## Conveyor sorting factory
-
-The sensor-driven factory is in [`src/pieas_sorting`](src/pieas_sorting/README.md).
-It adds one RGBD camera, one LiDAR, an indexed conveyor, six shape parts, three bins,
-perception, a task state machine and an explicitly modelled simulation suction tool.
-Start with its [walkthrough](src/pieas_sorting/docs/WALKTHROUGH.md) and
-[validation limits](src/pieas_sorting/docs/VALIDATION.md), then follow its build/run commands.
-The original arm lab and MoveIt lessons remain available.
+Arm geometry comes from the original PIEAS project scene. That scene credits On Robot ApS for the RG2 gripper CAD. Third-party model rights remain with their respective owners; this repository does not grant a new licence for those assets.

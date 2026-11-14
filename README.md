@@ -1,22 +1,39 @@
-# Supervised Teleoperation Control System for a 6 DOF Serial Chain Manipulator
+# PIEAS Robotic Arm: Embedded Control and ROS 2 Simulation
 
-Final year BS thesis project (Electrical Engineering, PIEAS, 2024) on designing and building the embedded control system for a 6 degree of freedom robotic arm, with a focus on precise motor control and a master-slave communication architecture over CAN bus.
+This project started as my final year BS Electrical Engineering thesis at PIEAS in 2024. Our team worked on supervised teleoperation of a six-DOF manipulator using STM32 controllers, encoder feedback and CAN communication. My work now continues with the same arm model in ROS 2, Gazebo and MoveIt, with a focus on motion planning, perception and pick-and-place tasks.
 
-Supervisor: Dr. Nasir Rehman Jadoon
+The reason for this extension is simple: I want to connect robotics algorithms with a working system and study their behaviour through repeatable experiments before moving to hardware.
 
-<p align="left">
-<img src="6_DOF.png" width="400">
-</p>
+Supervisor for the original thesis: Dr. Nasir Rehman Jadoon.
 
-## ROS 2 intelligent robotics lab
+![Original PIEAS arm](6_DOF.png)
 
-I am extending this arm into a simulation project for motion planning, perception, and autonomous manipulation using ROS 2 Jazzy and Gazebo Harmonic.
+## Project development
 
-**[Open the robotics lab](robotics_lab/README.md)** · **[Setup and 12-stage roadmap](robotics_lab/START_HERE.md)**
+The simulation workspace has four packages. Each stage adds a capability needed by the next one.
 
-The starter includes the extracted URDF and meshes, a six-joint trajectory controller configuration, an overhead RGB-D camera, and a 3D LiDAR world. Configuration checks passed offline. Integrated Gazebo execution is pending. Gripper actuation, MoveIt integration, and autonomous grasping are planned milestones.
+| Stage | Work and purpose | Documentation |
+| --- | --- | --- |
+| 1. Robot model and Gazebo | Recover the original geometry and joint chain, then establish a model that loads and reports joint states. | [Robot description](robotics_lab/src/pieas_arm_description/README.md) |
+| 2. Joint control | Connect timed joint commands to simulated motion and compare the command with feedback. | [Control experiments](robotics_lab/src/pieas_arm_control/README.md) |
+| 3. Motion planning | Add collision checking, joint-space planning, inverse kinematics and tool-position tasks. | [MoveIt integration](robotics_lab/src/pieas_arm_moveit_config/README.md) |
+| 4. Factory sorting | Use RGB-D and LiDAR measurements to classify parts, choose a bin and run a pick-and-place sequence. | [Conveyor sorting cell](robotics_lab/src/pieas_sorting/README.md) |
 
-## What this project does
+The simulated chain contains one linear rail joint and five rotary joints. The original gripper is a rigid model; opening and closing its fingers is a separate development task.
+
+## Current work
+
+Basic joint motion, MoveIt planning and a three-leg tool-position sequence have been exercised in Gazebo. A six-object sorting batch also completed locally with the simulation suction tool. These are simulation results, not a claim of hardware-ready autonomous operation.
+
+The current factory launch has since been changed to display the original gripper. The sorting application still uses suction pickup assumptions, so that combination is not yet a working finger-grasping system. My next step is to preserve the suction mode and add a selectable original-gripper mode with finger joints, control and grasp verification. Robot-mounted camera and LiDAR integration is also planned; the existing factory sensors are fixed overhead.
+
+[Progress and results](robotics_lab/EXPERIMENTS.md) · [Planned improvements](robotics_lab/docs/ROADMAP.md)
+
+## Working with the repository
+
+The simulation targets Ubuntu 24.04, ROS 2 Jazzy and Gazebo Harmonic. The [workspace overview](robotics_lab/README.md) explains the packages, and the [setup guide](robotics_lab/START_HERE.md) covers installation and launch commands. The [code reading guide](robotics_lab/docs/CODE_GUIDE.md) explains the file types and the order in which the code runs.
+
+## Original hardware project
 
 The arm has 6 joints, and each joint is driven by its own DC motor controlled by a dedicated STM32F103C8T6 microcontroller. A separate STM32 acts as the master controller, computes the inverse kinematics for a given target position, and sends the required joint angles (as encoder counts) to each joint controller over CAN bus. Each slave controller then closes its own position control loop using encoder feedback and drives the motor through an IBT-2 driver until it reaches the target.
 
@@ -49,7 +66,7 @@ Each joint uses a closed-loop PID position controller based on encoder feedback.
 
 ##  Thesis Report  
 
-You can read the complete report here:  [**6DOF_Control – Full PDF Report**](./6DOF_Robotic_Manipulator_Thesis.pdf)
+The complete thesis is available here:  [**6DOF_Control – Full PDF Report**](./6DOF_Robotic_Manipulator_Thesis.pdf)
 
 ## Notes
 

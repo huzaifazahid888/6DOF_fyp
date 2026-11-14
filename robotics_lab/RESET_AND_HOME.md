@@ -1,4 +1,6 @@
-# World startup and reset
+# World startup, reset and home
+
+[Workspace overview](README.md) · [Robot model](src/pieas_arm_description/README.md)
 
 The arm is now assembled into the startup world before Gazebo starts. Previously,
 `ros_gz_sim create` inserted it after the empty lab had loaded. A full reset could
@@ -14,10 +16,9 @@ still opens the environment without the generated arm.
 The moving joints remain dynamic. Do not set the entire robot static to keep it
 visible. The existing fixed base mount anchors it to the world.
 
-## Working baseline
+## Historical holding experiment
 
-Joints 3 and 4 use effort 10 Nm and velocity 0.5 rad/s. The user observed holding
-at zero under gravity with these values. Raising effort alone from 10 to 100 Nm
+An earlier local experiment used effort 10 Nm and velocity 0.5 rad/s for joints 3 and 4 and observed holding at zero under gravity. These are historical settings; the source URDF is authoritative for current limits. Raising effort alone from 10 to 100 Nm
 with the original 0.034906585 rad/s velocity ceiling did not fix sagging. These
 observations do not validate all poses, payloads, or physical motor ratings.
 
@@ -40,12 +41,11 @@ project's Jazzy installation, but controller recovery must be tested separately.
 If Reset crashes or leaves controllers unavailable, retain the log; this change
 only addresses initial-world membership, not an upstream plugin lifecycle bug.
 
-Returning home should ultimately be a trajectory to the home joint positions,
+Returning home is a trajectory to the home joint positions,
 without destroying the world or rewinding time. It is distinct from full Reset.
 
 ## Validation status
 
 Python syntax and isolated world-assembly checks passed. Tests mocked `gz sdf`
 and checked resource paths, preserved environment models, joint limits, and
-failure cleanup. No ROS/Gazebo runtime is installed in the editing environment;
-actual URDF conversion, startup, and GUI Reset require the Ubuntu test above.
+failure cleanup. Local work subsequently observed startup and model retention after reset. The procedure above remains necessary when checking another version or installation; model retention alone does not validate controller recovery.

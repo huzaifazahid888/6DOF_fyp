@@ -1,8 +1,12 @@
-# Read the factory implementation from input to output
+# Factory implementation walkthrough
+
+[Package overview](../README.md) · [Operation](RUNNING.md) · [Validation](VALIDATION.md)
+
+This walkthrough describes the suction-based sorting implementation. The current launch instead displays the original rigid gripper; the task has not yet been adapted to finger grasping. The distinction is tracked in the package overview.
 
 ## 1. What the application actually does
 
-The earlier tool sequence answered: “Can I put tool0 at these XYZ coordinates?” The factory answers: “What object arrived, where is it, where should it go, and did it get there?” It adds perception and task decisions around the motion planning you already tested.
+The earlier tool sequence answered: “Can I put tool0 at these XYZ coordinates?” The factory answers: “What object arrived, where is it, where should it go, and did it get there?” It adds perception and task decisions around the arm motion-planning stage.
 
 An indexed conveyor moves a batch of six physical parts. It brakes when its leading part reaches the station. A camera and LiDAR observe that stationary part. The application classifies the visible shape, estimates its pose, picks it with a simulated suction tool, selects the matching bin, and checks placement. A fault interrupts the sequence; a failed command does not silently advance to the next state.
 
@@ -44,11 +48,11 @@ The plugin indexes from the leading part's simulator position, equivalent to a s
 
 Queued parts occupy a conservative MoveIt keepout volume upstream of the station. The active part uses its measured geometry. The keepout is a planning exclusion, not an extra physical wall in Gazebo.
 
-## 4. Why a suction tool replaces the old RG2 geometry
+## 4. Suction baseline and original gripper
 
 The saved RG2 consists of one rigid visual/collision model. There are no finger joints or finger actuator commands. Claiming it can close and physically grip would be incorrect.
 
-`robot_variant()` creates a temporary URDF with a shaft and circular suction cup on `rg2_link`. The arm joints and `tool0` transform remain exactly the same. It supplies a new tool mass/inertia consistent with a light simulation tool. Both Gazebo and MoveIt receive this same description. Your original URDF remains unchanged.
+`robot_variant()` creates a temporary URDF with a shaft and circular suction cup on `rg2_link`. The arm joints and `tool0` transform remain exactly the same. It supplies a new tool mass/inertia consistent with a light simulation tool. Both Gazebo and MoveIt receive this same description. The original URDF remains unchanged by this conversion. The current launch bypasses `robot_variant()` and reads that original description directly, so this suction replacement is not currently selected.
 
 At the pickup point, `factory_system.cpp` checks the tool's lateral distance, height, upward tool axis and the part's speed. Only then does `grip` create a Gazebo `DetachableJoint` of type `fixed` between the suction link and the part. The joint carries the part's simulated mass. `release` removes it, allowing gravity to act freely.
 
@@ -64,7 +68,7 @@ The camera optical frame uses X right, Y down, Z forward. The Gazebo camera link
 
 ## 6. From image pixels to a measured object
 
-Read `perception_core.py::project()` first. The pinhole equations are:
+The projection starts in `perception_core.py::project()`. The pinhole equations are:
 
 ```
 Xcamera = (u - cx) * depth / fx
@@ -94,7 +98,7 @@ This is a consistency gate, not a Kalman filter or a claim that both sensors ind
 
 `perception.py` checks timestamp freshness and RGB/depth/LiDAR alignment. `Stability` requires four independent frames with the same class and less than 2 mm centroid change between successive frames. Repeated callbacks on one frame do not count as new observations. The stationary indexed belt makes this a suitable first perception-to-manipulation task.
 
-## 8. How the joint angles are found now
+## 8. Factory inverse kinematics
 
 The earlier `tool_sequence` still uses MoveIt's KDL IK service and is unchanged. The factory adds `kinematics.py` because a suction cup needs a position and an upright axis, but does not need a fixed yaw. Fixing all three orientation angles would unnecessarily constrain this particular arm.
 
@@ -148,6 +152,6 @@ Read `/factory/task_state` to see the current task phase, `/factory/detections` 
 
 ## 12. Hardware boundary
 
-Camera calibration and transforms must be measured on a real cell. The simulation backend would be replaced by a conveyor PLC/motor interface and a real gripper command/status driver. The ROS controller backend would be replaced by your motor/encoder hardware interface. Shape perception and the task state machine could remain structurally similar, but timing, payload limits, joint limits, collision geometry and failure handling require commissioning.
+Camera calibration and transforms must be measured on a real cell. The simulation backend would be replaced by a conveyor PLC/motor interface and a real gripper command/status driver. The ROS controller backend would be replaced by a motor/encoder hardware interface. Shape perception and the task state machine could remain structurally similar, but timing, payload limits, joint limits, collision geometry and failure handling require commissioning.
 
-Your STM32/CAN experience fits precisely at that boundary: the PC chooses task goals and planned trajectories; embedded firmware runs deterministic actuator control, reports measured state and enforces local limits. The simulator is currently substituting for that machinery.
+The connection to the original STM32/CAN work is at that boundary: the PC chooses task goals and planned trajectories; embedded firmware runs deterministic actuator control, reports measured state and enforces local limits. The simulator is currently substituting for that machinery.
