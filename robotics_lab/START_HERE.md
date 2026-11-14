@@ -6,7 +6,7 @@ The package in src contains your extracted arm, six position command interfaces,
 
 Offline checks cover XML/YAML syntax, Python syntax, joint names, file references, and the original model's forward kinematics. ROS 2 and Gazebo are unavailable in this environment, so the integrated launch, plugins, sensor topics, TF conventions, and controller behavior require runtime validation on your Ubuntu computer. Treat this package as the starting implementation to test.
 
-Your arm has one prismatic and five rotary joints. RG2 geometry is fixed in the saved configuration. Four arm effort limits are provisional. The source's ±0.5 m slide travel must be narrowed after checking the actual rail. The scene's masses and inertias are carried forward as simulation data. Current position control is suitable for planning integration. Controller robustness, payload response, and PID studies need realistic effort control and actuator dynamics later.
+arm has one prismatic and five rotary joints. RG2 geometry is fixed in the saved configuration. Four arm effort limits are provisional. The source's ±0.5 m slide travel must be narrowed after checking the actual rail. The scene's masses and inertias are carried forward as simulation data. Current position control is suitable for planning integration. Controller robustness, payload response, and PID studies need realistic effort control and actuator dynamics later.
 
 ## Tomorrow morning, first hour
 
