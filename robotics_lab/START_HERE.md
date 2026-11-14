@@ -1,7 +1,3 @@
-# Your PIEAS arm robotics lab
-
-Prepared for Muhammad Huzaifa, 10 November 2026.
-
 The goal is an arm that estimates object poses, plans collision-free motion, executes timed trajectories, checks the outcome, and recovers from failures. This is a multiweek project. At roughly one hour per session, allow 30–50 sessions for the core stages and additional time for learning algorithms. These are planning estimates.
 
 ## What is ready
