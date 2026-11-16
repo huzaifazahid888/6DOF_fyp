@@ -1,0 +1,46 @@
+# Metres/radians. A scaled trellis workcell, not a full-size orchard robot.
+seed: 17
+fruit_radius: 0.016
+fruits:
+  - {xyz: [0.36, -0.065, 0.145], appearance: ripe}
+  - {xyz: [0.36, 0.0, 0.145], appearance: unripe}
+  - {xyz: [0.36, 0.065, 0.145], appearance: damaged}
+bins:
+  ripe: [0.20, -0.21, 0.0]
+  unripe: [0.04, -0.21, 0.0]
+  damaged: [-0.12, -0.21, 0.0]
+bin_inner: 0.12
+bin_wall: 0.008
+bin_height: 0.09
+bin_floor: 0.03
+camera:
+  xyz: [0.36, 0.0, 0.70]
+  rpy: [0.0, 1.5707963267948966, 0.0]
+  width: 640
+  height: 480
+  hfov: 0.80
+lidar:
+  xyz: [0.36, 0.0, 0.78]
+  rpy: [0.0, 1.5707963267948966, 0.0]
+perception:
+  roi: [0.32, 0.40, -0.10, 0.10, 0.115, 0.185]
+  radius_min: 0.012
+  radius_max: 0.021
+  max_fit_error: 0.0025
+  min_visible_fraction: 0.50
+  min_points: 50
+  pixel_confidence: 0.65
+  grade_confidence: 0.70
+  damage_fraction: 0.035
+  stable_frames: 4
+  min_lidar_points: 4
+  lidar_tolerance: 0.006
+motion:
+  rail_limit: 0.16
+  clearance_z: 0.23
+  release_top_z: 0.14
+  endpoint_tolerance: 0.003
+  upright_tolerance: 0.12
+  max_cycles: 3
+  branch_margin: 0.004
+  max_drop_height: 0.08
