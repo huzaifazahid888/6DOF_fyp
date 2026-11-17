@@ -144,3 +144,17 @@ def test_lidar_sightlines_clear_camera_housing_and_mount():
                     hits=sorted([(low[axis]-start[axis])/direction[axis],(high[axis]-start[axis])/direction[axis]])
                     near=max(near,hits[0]);far=min(far,hits[1])
             assert near>far, 'LiDAR line of sight blocked by sensor mounting geometry'
+
+
+def test_gazebo_recorded_frame_regression():
+    # Development regression, not an independent evaluation scene.
+    data=np.load(ROOT/'test/fixtures/gazebo_frame.npz')
+    camera=dict(C['camera'],xyz=data['camera_xyz'].tolist())
+    lidar=dict(C['lidar'],xyz=data['lidar_xyz'].tolist())
+    rotation,translation=sensor_transform(camera,True)
+    lr,lt=sensor_transform(lidar)
+    found,_=detect(data['rgb'],data['depth'],data['intrinsics'],rotation,translation,
+                   data['lidar']@lr.T+lt,C['perception'],MODEL)
+    assert [f['grade'] for f in found]==['ripe','unripe','damaged']
+    for fruit,y in zip(found,[-.065,0,.065]):
+        assert np.linalg.norm(np.array(fruit['xyz'])-[.36,y,.145])<.002

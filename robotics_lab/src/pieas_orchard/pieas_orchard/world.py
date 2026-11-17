@@ -122,8 +122,10 @@ def robot_description(source,c):
     base=root.find("link[@name='base_link']")
     # Visible base-mounted mast: fixed to the robot, not to the moving wrist.
     for name,xyz,size in [('mast',[-.22,.19,.39],[.015,.015,.78]),
-                           ('boom',[.07,.19,.78],[.595,.015,.015]),
-                           ('camera_support',[.395,.095,.74],[.012,.20,.08])]:
+                           ('boom',[.0875,.19,.78],[.635,.015,.015]),
+                           ('camera_support',[.395,.095,.80],[.012,.20,.12]),
+                           ('camera_bracket',[.3775,0,.735],[.035,.015,.015]),
+                           ('lidar_bracket',[.3475,0,.820],[.095,.015,.015])]:
         for kind in ['visual','collision']:
             el=ET.SubElement(base,kind,name=name+'_'+kind)
             ET.SubElement(el,'origin',xyz=' '.join(map(str,xyz)),rpy='0 0 0')
@@ -149,3 +151,4 @@ def robot_description(source,c):
     ET.SubElement(joint,'parent',link='orchard_camera');ET.SubElement(joint,'child',link='orchard_camera_optical')
     ET.SubElement(joint,'origin',xyz='0 0 0',rpy='-1.5707963267948966 0 -1.5707963267948966')
     return ET.tostring(root,encoding='unicode')
+

@@ -22,7 +22,10 @@ def samples(seed,n):
     for cls,palettes in enumerate(PALETTES):
         palette=np.array(palettes)
         base=palette[rng.integers(len(palette),size=n)]
-        x=base*rng.uniform(.40,1.15,(n,1))+rng.normal(0,.018,(n,3))
+        linear=np.clip(base*rng.uniform(.25,1.15,(n,1))+rng.normal(0,.006,(n,3)),0,1)
+        # Cover both linear fixtures and the renderer's gamma-encoded RGB output.
+        gamma=rng.choice([1.,1/2.2],size=(n,1))+rng.uniform(-.025,.025,(n,1))
+        x=linear**gamma+rng.normal(0,.01,(n,3))
         xs.append(np.clip(x,0,1));ys.extend([cls]*n)
     return np.vstack(xs),np.array(ys)
 def train(output):
@@ -38,3 +41,4 @@ def train(output):
     Path(output).write_text(json.dumps(data,indent=2)+'\n');print(json.dumps({k:v for k,v in data.items() if k not in ['weights','biases']},indent=2))
 if __name__=='__main__':
     train(Path(__file__).resolve().parents[1]/'models/appearance.json')
+

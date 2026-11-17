@@ -40,7 +40,7 @@ class Perception(Node):
                                     (CameraInfo,'/orchard/camera/camera_info','info'),
                                     (PointCloud2,'/orchard/lidar/points','cloud')]:
             self.create_subscription(kind,topic,lambda m,a=attribute:self.receive(a,m),qos_profile_sensor_data)
-        self.create_timer(0.05,self.tick)
+        self.create_timer(0.10,self.tick)
 
     def receive(self,attribute,message):
         setattr(self,attribute,message)
@@ -56,21 +56,21 @@ class Perception(Node):
         now=self.get_clock().now().nanoseconds*1e-9
         if any(x is None for x in [self.rgb,self.depth,self.info,self.cloud]):
             self.publish([],'waiting_for_rgb_depth_camera_info_lidar',now);return
-        # Select a synchronized set, rather than assuming latest callbacks align.
+        latest=[self.buffers[key][-1] for key in ['rgb','depth','cloud']]
+        if any(not 0<=now-stamp(m)<0.5 for m in latest):
+            self.stability.update([]);self.publish([],'stale_sensor_data',now);return
+        # Arrival order is not timestamp order. Ordinary callback gaps must not
+        # reset the consecutive-observation counter between synchronized frames.
+        matched=None
         for rgb in reversed(self.buffers['rgb']):
-            if stamp(rgb)<=self.last_rgb_stamp:continue
+            if stamp(rgb)<=self.last_rgb_stamp or not 0<=now-stamp(rgb)<.5:continue
             depth=min(self.buffers['depth'],key=lambda m:abs(stamp(m)-stamp(rgb)))
             cloud=min(self.buffers['cloud'],key=lambda m:abs(stamp(m)-stamp(rgb)))
+            if stamp(cloud)<=self.last_cloud_stamp:continue
             if abs(stamp(rgb)-stamp(depth))<=.06 and abs(stamp(rgb)-stamp(cloud))<=.15:
-                self.rgb,self.depth,self.cloud=rgb,depth,cloud
-                break
-        if any(not 0<=now-stamp(m)<0.5 for m in [self.rgb,self.depth,self.cloud]):
-            self.stability.update([]);self.publish([],'stale_sensor_data',now);return
-        if abs(stamp(self.rgb)-stamp(self.depth))>0.06 or abs(stamp(self.rgb)-stamp(self.cloud))>0.15:
-            self.stability.update([]);self.publish([],'sensor_timestamp_mismatch',now);return
-        # Do not count a repeated frame as another independent observation.
-        if stamp(self.rgb)==self.last_rgb_stamp or stamp(self.cloud)==self.last_cloud_stamp:return
-        if self.last_rgb_stamp>stamp(self.rgb):self.stability.update([])
+                matched=(rgb,depth,cloud);break
+        if matched is None:return
+        self.rgb,self.depth,self.cloud=matched
         self.last_rgb_stamp=stamp(self.rgb);self.last_cloud_stamp=stamp(self.cloud)
         try:
             rgb=self.bridge.imgmsg_to_cv2(self.rgb,desired_encoding='rgb8')
