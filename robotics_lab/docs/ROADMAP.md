@@ -2,7 +2,7 @@
 
 [Workspace overview](../README.md) · [Recorded experiments](../EXPERIMENTS.md)
 
-The first four stages established the model, controller connection, motion planning and a sensor-driven sorting baseline. My current focus is understanding and improving that implementation before extending it to other tasks. The items below are planned work unless explicitly described as an existing baseline.
+The first four stages established the model, controller connection, motion planning and a sensor-driven sorting baseline. My current focus is understanding and improving that implementation before extending it to other tasks. The separate [orchard package](../src/pieas_orchard/README.md) now explores harvesting; its validation notes track acceptance. The items below remain planned work unless explicitly described as an existing baseline.
 
 ## Current priority: two tool modes
 
@@ -16,7 +16,7 @@ Completion evidence: both tool modes load consistently, opening and closing work
 
 ## Robot-mounted sensing
 
-The existing camera and LiDAR are fixed overhead. Robot-mounted sensing needs mounting geometry, sensor frames and timestamped transforms that follow the arm. The perception code currently uses fixed sensor poses, so mounting changes require processing changes as well as URDF edits.
+The factory camera and LiDAR are fixed overhead. The orchard implements a visible mast on the anchored robot base. A moving wrist camera remains future work. Robot-mounted sensing needs mounting geometry, sensor frames and timestamped transforms that follow the arm. The perception code currently uses fixed sensor poses, so mounting changes require processing changes as well as URDF edits.
 
 Completion evidence: projected points agree with the scene at multiple arm poses, the robot does not classify its own body as a part, and occlusion or missing data causes an explicit rejection.
 
@@ -24,7 +24,7 @@ Completion evidence: projected points agree with the scene at multiple arm poses
 
 The current classifier uses a known family of isolated green shapes. Future digital image processing experiments can compare segmentation methods, contour features, depth fitting and robustness to background, lighting and partial occlusion. Different object families need measured classification and pose-error results before use in the task.
 
-Completion evidence: held-out scenes, a confusion matrix, position-error distributions and separate records for rejected observations. A trained detector is an optional later comparison, not an existing feature.
+Completion evidence: held-out scenes, a confusion matrix, position-error distributions and separate records for rejected observations. The orchard adds a neural pixel classifier trained on synthetic appearance samples. Real orchard detection and grading require a representative image dataset and separate validation.
 
 ## Planning and trajectory comparisons
 
@@ -41,3 +41,4 @@ Hardware integration would replace Gazebo's actuator and machine interfaces with
 ## Recording progress
 
 Each new experiment should identify its revision, model/tool configuration, starting conditions, parameter changes and measured result. The [experiment log](../EXPERIMENTS.md) separates completed observations from proposed work. A demonstration video or successful single run is useful evidence, but does not replace repeatability measurements.
+

@@ -1,4 +1,4 @@
-"""Finite-state sorting task. Every robot move is planned and checked by MoveIt.
+"""Finite-state harvesting task. Every robot move is planned and checked by MoveIt.
 
 The simulator plugin supplies only machine interlocks and attachment/drop status.
 Object class, pickup XYZ and size come exclusively from RGBD + LiDAR perception.
@@ -73,7 +73,7 @@ class Harvester(ToolSequence):
         deadline=time.monotonic()+timeout
         while rclpy.ok() and time.monotonic()<deadline:
             rclpy.spin_once(self,timeout_sec=0.05)
-            if self.reset_detected:raise RuntimeError('World reset: stop this task and relaunch the orchard.')
+            if self.reset_detected:raise RuntimeError('Tree contact or world reset: stop this task and relaunch the orchard.')
             if predicate():return
         raise RuntimeError('Timeout: '+description)
 
@@ -82,7 +82,7 @@ class Harvester(ToolSequence):
         deadline=time.monotonic()+seconds
         while rclpy.ok() and not future.done() and time.monotonic()<deadline:
             rclpy.spin_once(self,timeout_sec=0.05)
-            if self.reset_detected:raise RuntimeError('Gazebo reset during task; relaunch required.')
+            if self.reset_detected:raise RuntimeError('Tree contact or Gazebo reset during task; relaunch required.')
             if self.executing:
                 if time.monotonic()-self.machine_wall>3 or time.monotonic()-self.received>3:
                     raise RuntimeError('Execution feedback stopped; cancellation requested.')
@@ -102,7 +102,7 @@ class Harvester(ToolSequence):
         token=uuid.uuid4().hex
         def acknowledged():
             if self.machine and self.machine['ack']==token:
-                if self.machine['error']:raise RuntimeError('Factory command failed: '+self.machine['error'])
+                if self.machine['error']:raise RuntimeError('Orchard command failed: '+self.machine['error'])
                 return True
             self.commands.publish(String(data=f'{token}|{command}'))
             return False
@@ -374,3 +374,4 @@ def main():
         if node is not None:node.destroy_node()
         rclpy.shutdown()
     return code
+

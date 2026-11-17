@@ -1,4 +1,5 @@
 """ROS adapter: synchronise RGB/depth, transform LiDAR and publish detections."""
+from collections import deque
 import json
 import time
 import numpy as np
@@ -27,6 +28,7 @@ class Perception(Node):
         self.declare_parameter('config',str(Path(get_package_share_directory('pieas_orchard'))/'config/orchard.yaml'))
         self.c=load_config(self.get_parameter('config').value)
         self.bridge=CvBridge();self.rgb=None;self.depth=None;self.info=None;self.cloud=None
+        self.buffers={key:deque(maxlen=10) for key in ['rgb','depth','cloud']}
         self.last_rgb_stamp=-1.;self.last_warning=0.;self.last_cloud_stamp=-1.
         self.stability=StableDetections(self.c['perception']['stable_frames'])
         self.model=AppearanceModel(Path(get_package_share_directory('pieas_orchard'))/'models/appearance.json')
@@ -37,8 +39,15 @@ class Perception(Node):
                                     (Image,'/orchard/camera/depth_image','depth'),
                                     (CameraInfo,'/orchard/camera/camera_info','info'),
                                     (PointCloud2,'/orchard/lidar/points','cloud')]:
-            self.create_subscription(kind,topic,lambda m,a=attribute:setattr(self,a,m),qos_profile_sensor_data)
+            self.create_subscription(kind,topic,lambda m,a=attribute:self.receive(a,m),qos_profile_sensor_data)
         self.create_timer(0.05,self.tick)
+
+    def receive(self,attribute,message):
+        setattr(self,attribute,message)
+        if attribute in self.buffers:
+            buffer=self.buffers[attribute]
+            if buffer and stamp(message)<stamp(buffer[-1]):buffer.clear()
+            buffer.append(message)
 
     def publish(self,detections,reason,when):
         self.output.publish(String(data=json.dumps({'stamp':when,'detections':detections,'reason':reason},allow_nan=False)))
@@ -47,6 +56,14 @@ class Perception(Node):
         now=self.get_clock().now().nanoseconds*1e-9
         if any(x is None for x in [self.rgb,self.depth,self.info,self.cloud]):
             self.publish([],'waiting_for_rgb_depth_camera_info_lidar',now);return
+        # Select a synchronized set, rather than assuming latest callbacks align.
+        for rgb in reversed(self.buffers['rgb']):
+            if stamp(rgb)<=self.last_rgb_stamp:continue
+            depth=min(self.buffers['depth'],key=lambda m:abs(stamp(m)-stamp(rgb)))
+            cloud=min(self.buffers['cloud'],key=lambda m:abs(stamp(m)-stamp(rgb)))
+            if abs(stamp(rgb)-stamp(depth))<=.06 and abs(stamp(rgb)-stamp(cloud))<=.15:
+                self.rgb,self.depth,self.cloud=rgb,depth,cloud
+                break
         if any(not 0<=now-stamp(m)<0.5 for m in [self.rgb,self.depth,self.cloud]):
             self.stability.update([]);self.publish([],'stale_sensor_data',now);return
         if abs(stamp(self.rgb)-stamp(self.depth))>0.06 or abs(stamp(self.rgb)-stamp(self.cloud))>0.15:
@@ -92,3 +109,4 @@ def main():
     try:rclpy.spin(node)
     except KeyboardInterrupt:pass
     finally:node.destroy_node();rclpy.try_shutdown()
+

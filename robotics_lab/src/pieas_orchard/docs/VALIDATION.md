@@ -2,7 +2,7 @@
 
 ## Offline checks
 
-Twelve CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms and numerical reachability.
+Thirteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability and unobstructed LiDAR mounting sightlines.
 
 A separate actual-mesh FCL audit found valid sampled home, park, fruit approach/pick and basket endpoint configurations. That check does not prove a continuous collision-free path or successful Gazebo execution.
 
@@ -10,7 +10,7 @@ The learned model's held-out synthetic pixel accuracy is recorded in the model c
 
 ## Runtime acceptance
 
-The dedicated Orchard Jazzy integration workflow builds the plugin and package, runs CPU tests, launches the rendered RGB-D/LiDAR simulation, requires all three fruit grades and executes three verified placements. It also requires no reported robot-tree contact. Runtime acceptance is pending for the initial implementation; the workflow result must be inspected before claiming a completed orchard demonstration.
+The dedicated Orchard Jazzy integration workflow builds the plugin and package, runs CPU tests, launches the rendered RGB-D/LiDAR simulation, requires all three fruit grades and executes three verified placements. It also requires no reported robot-tree contact. The initial integration build found an incorrect Gazebo contact-message accessor. That build error was corrected and the next CI build and CPU tests passed. The rendered readiness test then received advancing RGB, depth, LiDAR, joint feedback and backend status, but no accepted fruit detections. That run did not attempt harvesting. Sensor mounting and timestamp synchronization were revised next. Full harvesting acceptance remains pending; a successful build is not a completed orchard demonstration.
 
 Logs are written to `/tmp/pieas_orchard_launch.log`, `/tmp/pieas_orchard_task.log` and `/tmp/pieas_orchard_batch` in CI. Local task results are written under `~/.ros/pieas_orchard/`. The task phase and detections are visible on `/orchard/task_state` and `/orchard/detections`.
 
@@ -23,3 +23,4 @@ A physics fixed joint holds each fruit on a branch until a checked suction comma
 The camera and LiDAR are fixed to the robot base mast. This is robot mounting, not a moving wrist camera. Their static world transforms are valid because the robot base is anchored; a mobile base would need timestamped dynamic transforms in perception.
 
 Protected branch/leaf contact is a fault signal. It is not a calibrated force or damage measurement. Hidden internal fruit quality and real ripeness are not observable from this synthetic model. Rejected fruit remains on the tree; the task must not report a completed requested batch when observations are missing.
+

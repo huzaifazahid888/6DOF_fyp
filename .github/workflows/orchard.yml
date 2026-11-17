@@ -54,3 +54,5 @@ jobs:
             /tmp/pieas_orchard_launch.log
             /tmp/pieas_orchard_task.log
             /tmp/pieas_orchard_batch
+            /tmp/pieas_orchard_sensors
+

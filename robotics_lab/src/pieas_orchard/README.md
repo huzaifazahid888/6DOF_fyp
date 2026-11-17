@@ -10,7 +10,7 @@ This is a scaled simulation workcell. The apples are 32 mm in diameter, branches
 
 RGB and depth come from a camera on a visible mast attached to the robot's fixed base. A second sensor on the mast supplies LiDAR points. A small trained neural network labels image pixels; connected regions and robust sphere fitting estimate fruit centres and radii. LiDAR corroborates the surface. A visible blemish takes priority over the ripeness class when selecting a basket.
 
-The task plans around shared branch geometry, constrains the tool's approach corridor and includes the carried fruit in MoveIt's scene. Gazebo monitors robot contact with protected branches and leaves. Contact, stale data, uncertain detection or a failed grasp stops the task. Completely hidden fruit is not inferred from simulator coordinates.
+The task plans around shared branch geometry, constrains the tool's approach corridor and includes the carried fruit in MoveIt's scene. Gazebo monitors robot and picked-fruit contact with protected branches and leaves. Contact, stale data, uncertain detection or a failed grasp stops the task. Completely hidden fruit is not inferred from simulator coordinates.
 
 The orchard explicitly uses the simulation suction tool. It does not silently change the original gripper or the sorting launch. Finger actuation remains a separate project milestone.
 
@@ -64,3 +64,4 @@ The current acceptance status and any known runtime failures are recorded in [VA
 Ripeness means a synthetic red/green appearance class. Quality means a visible simulated surface blemish, not taste, firmness, disease diagnosis or internal quality. The classifier has not been trained on real orchard photographs. Partial occlusion is supported only when enough visible depth surface remains; difficult observations are rejected.
 
 Zero reported tree contact is a useful experiment metric, not proof of zero biological damage. The stem is detached by a simulation command after a proximity/orientation check, without calibrated cutting, twisting or break force. The limited release height is also not a calibrated bruising model.
+

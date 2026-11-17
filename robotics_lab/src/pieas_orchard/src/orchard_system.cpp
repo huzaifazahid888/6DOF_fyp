@@ -40,6 +40,7 @@ class OrchardSystem : public System, public ISystemConfigure, public ISystemPreU
     transport::Node::Publisher publisher;
     std::mutex mutex;
     std::deque<std::string> commands;
+    std::deque<msgs::Entity> contactEntities;
     std::chrono::steady_clock::time_point heartbeat{};
     std::vector<Fruit> fruits;
     Entity tool{kNullEntity}, branch{kNullEntity}, grip{kNullEntity};
@@ -65,11 +66,40 @@ class OrchardSystem : public System, public ISystemConfigure, public ISystemPreU
         std::lock_guard<std::mutex> lock(mutex);
         for (const auto &c:m.contact())
         {
-            // These messages come only from protected branch/leaf sensors.
-            // Initial fruit/stem contact is excluded; robot contact is latched.
-            if (c.collision1().name().find("pieas_arm")!=std::string::npos ||
-                c.collision2().name().find("pieas_arm")!=std::string::npos)
-                treeContact=true;
+            if (contactEntities.size() >= 512)
+            {
+                // A contact backlog must not silently hide a collision.
+                treeContact = true;
+                break;
+            }
+            contactEntities.push_back(c.collision1());
+            contactEntities.push_back(c.collision2());
+        }
+    }
+    void CheckContacts(EntityComponentManager &ecm)
+    {
+        std::deque<msgs::Entity> contacts;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            contacts.swap(contactEntities);
+        }
+        for (const auto &contact : contacts)
+        {
+            const auto entity = entityFromMsg(ecm, contact);
+            const auto name = scopedName(entity, ecm, "::", false);
+            bool prohibited = name.find("pieas_arm::") != std::string::npos;
+            for (int i = 0; i < count; ++i)
+            {
+                if (!fruits[i].picked) continue;
+                std::ostringstream fruitName;
+                fruitName << "apple_" << std::setw(3) << std::setfill('0') << i << "::";
+                prohibited = prohibited || name.find(fruitName.str()) != std::string::npos;
+            }
+            if (prohibited)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                treeContact = true;
+            }
         }
     }
     bool Alive()
@@ -123,7 +153,9 @@ class OrchardSystem : public System, public ISystemConfigure, public ISystemPreU
         if (cmd!="grip" || held>=0) { error="invalid_grip_command";return; }
         auto pose=worldPose(tool,ecm)*offset;
         auto velocity=Link(tool).WorldLinearVelocity(ecm);
-        if (!velocity || velocity->Length()>.012 || pose.Rot().RotateVector(math::Vector3d::UnitZ).Z()<.98)
+        auto angular=Link(tool).WorldAngularVelocity(ecm);
+        const auto lever=worldPose(tool,ecm).Rot().RotateVector(offset.Pos());
+        if (!velocity || !angular || (*velocity+angular->Cross(lever)).Length()>.012 || angular->Length()>.05 || pose.Rot().RotateVector(math::Vector3d::UnitZ).Z()<.98)
         { error="tool_moving_or_tilted";return; }
         int chosen=-1;double nearest=1.;
         for (int i=0;i<count;++i)
@@ -156,11 +188,12 @@ public:
         for (auto &f:fruits) if(f.stem!=kNullEntity) ecm.RequestRemoveEntity(f.stem);
         fruits.assign(count,Fruit{});tool=branch=grip=kNullEntity;held=released=-1;
         lastPublish=-1;resetFault=true;error="world_reset_restart_required";
-        std::lock_guard<std::mutex> lock(mutex);commands.clear();heartbeat={};
+        std::lock_guard<std::mutex> lock(mutex);commands.clear();contactEntities.clear();heartbeat={};
     }
     void PreUpdate(const UpdateInfo &info,EntityComponentManager &ecm) override
     {
         if (info.paused || !Resolve(ecm)) return;
+        CheckContacts(ecm);
         std::deque<std::string> pending;
         { std::lock_guard<std::mutex> lock(mutex);pending.swap(commands); }
         for (const auto &m:pending) Process(m,ecm);
@@ -185,3 +218,4 @@ public:
 GZ_ADD_PLUGIN(pieas::OrchardSystem,gz::sim::System,pieas::OrchardSystem::ISystemConfigure,
               pieas::OrchardSystem::ISystemPreUpdate,pieas::OrchardSystem::ISystemReset)
 GZ_ADD_PLUGIN_ALIAS(pieas::OrchardSystem,"pieas::OrchardSystem")
+

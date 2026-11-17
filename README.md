@@ -10,7 +10,7 @@ Supervisor for the original thesis: Dr. Nasir Rehman Jadoon.
 
 ## Project development
 
-The simulation workspace has four packages. Each stage adds a capability needed by the next one.
+The simulation workspace develops through five stages. The orchard experiment extends the same arm into a separate application alongside conveyor sorting.
 
 | Stage | Work and purpose | Documentation |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ The simulation workspace has four packages. Each stage adds a capability needed 
 | 2. Joint control | Connect timed joint commands to simulated motion and compare the command with feedback. | [Control experiments](robotics_lab/src/pieas_arm_control/README.md) |
 | 3. Motion planning | Add collision checking, joint-space planning, inverse kinematics and tool-position tasks. | [MoveIt integration](robotics_lab/src/pieas_arm_moveit_config/README.md) |
 | 4. Factory sorting | Use RGB-D and LiDAR measurements to classify parts, choose a bin and run a pick-and-place sequence. | [Conveyor sorting cell](robotics_lab/src/pieas_sorting/README.md) |
+| 5. Apple harvesting | Detect partially visible apples, plan around a trellis and sort fruit by simulated appearance. | [Orchard workcell](robotics_lab/src/pieas_orchard/README.md) |
 
 The simulated chain contains one linear rail joint and five rotary joints. The original gripper is a rigid model; opening and closing its fingers is a separate development task.
 
@@ -25,7 +26,7 @@ The simulated chain contains one linear rail joint and five rotary joints. The o
 
 Basic joint motion, MoveIt planning and a three-leg tool-position sequence have been exercised in Gazebo. A six-object sorting batch also completed locally with the simulation suction tool. These are simulation results, not a claim of hardware-ready autonomous operation.
 
-The current factory launch has since been changed to display the original gripper. The sorting application still uses suction pickup assumptions, so that combination is not yet a working finger-grasping system. My next step is to preserve the suction mode and add a selectable original-gripper mode with finger joints, control and grasp verification. Robot-mounted camera and LiDAR integration is also planned; the existing factory sensors are fixed overhead.
+The current factory launch has since been changed to display the original gripper. The sorting application still uses suction pickup assumptions, so that combination is not yet a working finger-grasping system. My next step is to preserve the suction mode and add a selectable original-gripper mode with finger joints, control and grasp verification. The factory sensors remain fixed overhead. The separate orchard package adds a camera and LiDAR on a mast attached to the fixed robot base. Its [validation record](robotics_lab/src/pieas_orchard/docs/VALIDATION.md) separates implemented features from verified runtime results.
 
 [Progress and results](robotics_lab/EXPERIMENTS.md) · [Planned improvements](robotics_lab/docs/ROADMAP.md)
 
@@ -71,3 +72,4 @@ The complete thesis is available here:  [**6DOF_Control – Full PDF Report**](.
 ## Notes
 
 This was a team project completed as a BS thesis at PIEAS.
+

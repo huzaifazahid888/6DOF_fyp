@@ -2,7 +2,7 @@
 
 [Project overview](../README.md) · [Setup](START_HERE.md) · [Code guide](docs/CODE_GUIDE.md) · [Results](EXPERIMENTS.md) · [Roadmap](docs/ROADMAP.md)
 
-I built this workspace to extend my bachelor's arm project from embedded joint control into perception and motion planning. The work developed in four stages, with a separate ROS package for each responsibility.
+I built this workspace to extend my bachelor's arm project from embedded joint control into perception and motion planning. The work developed in five stages, with a separate ROS package for each responsibility.
 
 ![Offline rendering of the extracted arm geometry](docs/arm_preview.png)
 
@@ -32,6 +32,12 @@ The factory connects an indexed conveyor, RGB-D camera, LiDAR, shape classificat
 
 Package: [pieas_sorting](src/pieas_sorting/README.md).
 
+## 5. Apple harvesting
+
+The orchard package adds a scaled trellis, partial leaf occlusion, a small trained appearance classifier and three fruit baskets. RGB-D estimates fruit geometry and LiDAR corroborates the visible surface. The task uses the simulation suction tool, collision-aware approach constraints and basket verification. This package has its own launch and does not change the factory configuration.
+
+Package: [pieas_orchard](src/pieas_orchard/README.md). Runtime evidence and limitations are recorded in its [validation notes](src/pieas_orchard/docs/VALIDATION.md).
+
 ## Current status
 
 | Capability | Status |
@@ -42,7 +48,8 @@ Package: [pieas_sorting](src/pieas_sorting/README.md).
 | Six-object suction sorting | Completed in a reported local run; historical CI results are linked in the factory validation notes |
 | Factory with restored original gripper | Current launch configuration; original finger grasping is not implemented |
 | Selectable suction/original tools | Planned; no `gripper_type` launch argument yet |
-| Camera and LiDAR | Fixed overhead sensors in the factory; robot mounting is planned |
+| Camera and LiDAR | Fixed overhead in the factory; fixed robot-base mast implemented in the orchard |
+| Apple harvesting | Implemented; see orchard validation for current integration status |
 | Dynamic obstacles, recovery and broader object recognition | Future experiments |
 
 ## Setup and reading order
@@ -60,3 +67,4 @@ The original gripper is one rigid link. The tested factory used a fixed-joint su
 ## Asset provenance
 
 Arm geometry comes from the original PIEAS project scene. That scene credits On Robot ApS for the RG2 gripper CAD. Third-party model rights remain with their respective owners; this repository does not grant a new licence for those assets.
+

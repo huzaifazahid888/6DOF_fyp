@@ -113,3 +113,34 @@ def test_model_is_trained_and_reproducible_metadata():
     assert data['synthetic_accuracy']>.95
     assert data['training_seed']!=data['test_seed']
     assert MODEL.weights[0].shape==(3,24)
+
+
+
+def test_lidar_sightlines_clear_camera_housing_and_mount():
+    # Ray/slab intersections catch hardware placed between a sensor and fruit.
+    robot=ET.fromstring(robot_description(ROOT.parent/'pieas_arm_description/urdf/pieas_control.urdf.in',C))
+    start=np.array(C['lidar']['xyz'])
+    obstacles=[]
+    base=robot.find("link[@name='base_link']")
+    for collision in base.findall('collision'):
+        box=collision.find('geometry/box')
+        if box is not None:
+            centre=np.array(list(map(float,collision.find('origin').get('xyz').split())))
+            half=np.array(list(map(float,box.get('size').split())))/2
+            obstacles.append((centre-half,centre+half))
+    # Camera housing is behind its local X lens axis. Transform eight corners.
+    rotation,translation=sensor_transform(C['camera'])
+    corners=np.array([[x,y,z] for x in [-.032,-.004] for y in [-.0175,.0175] for z in [-.0125,.0125]])
+    corners=corners@rotation.T+translation
+    obstacles.append((corners.min(axis=0),corners.max(axis=0)))
+    for fruit in C['fruits']:
+        direction=np.array(fruit['xyz'])-start
+        for low,high in obstacles:
+            near,far=0.,1.
+            for axis in range(3):
+                if abs(direction[axis])<1e-12:
+                    if not low[axis]<=start[axis]<=high[axis]:near,far=1.,0.;break
+                else:
+                    hits=sorted([(low[axis]-start[axis])/direction[axis],(high[axis]-start[axis])/direction[axis]])
+                    near=max(near,hits[0]);far=min(far,hits[1])
+            assert near>far, 'LiDAR line of sight blocked by sensor mounting geometry'
