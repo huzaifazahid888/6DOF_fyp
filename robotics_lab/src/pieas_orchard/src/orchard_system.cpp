@@ -67,8 +67,8 @@ class OrchardSystem : public System, public ISystemConfigure, public ISystemPreU
         {
             // These messages come only from protected branch/leaf sensors.
             // Initial fruit/stem contact is excluded; robot contact is latched.
-            if (c.collision1().find("pieas_arm")!=std::string::npos ||
-                c.collision2().find("pieas_arm")!=std::string::npos)
+            if (c.collision1().name().find("pieas_arm")!=std::string::npos ||
+                c.collision2().name().find("pieas_arm")!=std::string::npos)
                 treeContact=true;
         }
     }

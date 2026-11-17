@@ -123,7 +123,7 @@ def robot_description(source,c):
     # Visible base-mounted mast: fixed to the robot, not to the moving wrist.
     for name,xyz,size in [('mast',[-.22,.19,.39],[.015,.015,.78]),
                            ('boom',[.07,.19,.78],[.595,.015,.015]),
-                           ('camera_support',[.36,.095,.74],[.012,.20,.08])]:
+                           ('camera_support',[.395,.095,.74],[.012,.20,.08])]:
         for kind in ['visual','collision']:
             el=ET.SubElement(base,kind,name=name+'_'+kind)
             ET.SubElement(el,'origin',xyz=' '.join(map(str,xyz)),rpy='0 0 0')
