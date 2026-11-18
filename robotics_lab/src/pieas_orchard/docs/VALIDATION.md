@@ -2,7 +2,7 @@
 
 ## Offline checks
 
-Fourteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame.
+Fifteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame.
 
 A separate actual-mesh FCL audit found valid sampled home, park, fruit approach/pick and basket endpoint configurations. That check does not prove a continuous collision-free path or successful Gazebo execution.
 
@@ -26,3 +26,5 @@ Protected branch/leaf contact is a fault signal. It is not a calibrated force or
 
 
 The second rendered attempt localized apples but missed the damaged class. Gamma-aware appearance training fixes that recorded-frame regression. Synchronization now waits for matching frames without treating normal callback gaps as a stability failure. Full task execution is still subject to the dedicated integration result.
+
+Run 44108116903 passed the build and sensor grading acceptance. The arm reached the first fruit with 0.31 mm measured-state FK endpoint error and accepted the grasp. Withdrawal was correctly refused because the detected payload overlapped a padded twig in MoveIt. The twig endpoint was revised to leave space for branch padding and fruit pose-estimation tolerance; collision checking remains enabled. Three-fruit completion is not yet verified.

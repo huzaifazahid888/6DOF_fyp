@@ -158,3 +158,13 @@ def test_gazebo_recorded_frame_regression():
     assert [f['grade'] for f in found]==['ripe','unripe','damaged']
     for fruit,y in zip(found,[-.065,0,.065]):
         assert np.linalg.norm(np.array(fruit['xyz'])-[.36,y,.145])<.002
+
+
+def test_branch_padding_leaves_room_for_fruit_estimation_error():
+    # Fruit pose estimates can differ from truth within the accepted tolerance.
+    geometry={name:(np.array(xyz),np.array(size)) for name,xyz,size,_ in boxes(C)}
+    for i,fruit in enumerate(C['fruits']):
+        centre,size=geometry[f'twig_{i}']
+        padded_near=centre[0]-size[0]/2-C['motion']['branch_margin']
+        fruit_far=fruit['xyz'][0]+C['fruit_radius']+C['motion']['endpoint_tolerance']
+        assert padded_near>fruit_far

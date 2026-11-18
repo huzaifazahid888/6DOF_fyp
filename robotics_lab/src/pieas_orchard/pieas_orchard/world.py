@@ -15,7 +15,10 @@ def boxes(c):
               ('planter',[.46,0,.025],[.09,.12,.05],[.42,.26,.15])]
     for i,f in enumerate(c['fruits']):
         x,y,z=f['xyz']
-        result.append((f'twig_{i}',[(x+.435)/2,y,z-.007],[.435-x-.04,.005,.005],[.36,.20,.08]))
+        # Keep the padded woody branch clear of the fruit surface. The thin
+        # visual stem bridges this gap; its physics attachment is detachable.
+        start=x+c['fruit_radius']+.008
+        result.append((f'twig_{i}',[(start+.435)/2,y,z-.007],[.435-start,.005,.005],[.36,.20,.08]))
         # Small leaf over the far edge of each fruit: partial visual occlusion.
         result.append((f'leaf_guard_{i}',[x+.020,y+.009,z+.021],[.012,.025,.0015],[.08,.30,.06]))
     d,w,h,f=c['bin_inner'],c['bin_wall'],c['bin_height'],c['bin_floor']
