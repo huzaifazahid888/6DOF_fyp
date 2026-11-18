@@ -24,3 +24,19 @@ class StationaryWindow:
             return False
         if self.since is None:self.since=stamp
         return stamp-self.since>=self.duration
+
+
+def rank_configurations(candidates,current,continuous_indices=()):
+    """Prefer less joint travel; rail travel is normalized by 0.1 metre.
+
+    This ranks IK endpoints only. MoveIt still checks collisions and plans paths.
+    """
+    import numpy as np
+    current=np.asarray(current,dtype=float)
+    def cost(candidate):
+        delta=np.asarray(candidate,dtype=float)-current
+        for i in continuous_indices:delta[i]=math.atan2(math.sin(delta[i]),math.cos(delta[i]))
+        delta[0]/=.1
+        delta[-1]*=.3  # Suction allows wrist yaw; prioritize the load-bearing arm.
+        return float(delta@delta)
+    return sorted(candidates,key=cost)

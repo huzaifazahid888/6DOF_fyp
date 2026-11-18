@@ -28,7 +28,7 @@ A visible defect selects the damaged basket. Otherwise the dominant ripe or unri
 
 ## 4. Motion planning
 
-`move()` asks the shared numerical kinematics helper for joint configurations that put `tool0` at the requested XYZ while keeping the suction axis upright. IK produces candidate joint configurations; MoveIt then checks state validity and searches for a path between configurations. These are different operations.
+`move()` asks the shared numerical kinematics helper for joint configurations that put `tool0` at the requested XYZ while keeping the suction axis upright. IK produces candidate joint configurations. `motion.py` ranks them by joint travel from the measured state, with rail distance normalized separately and lower weight for free wrist yaw. This avoids selecting an extreme arm flip just because the numerical solver returned it first. MoveIt then checks state validity and searches for a path between configurations. These are different operations.
 
 The rail constraint limits translation. During descent and extraction, a tool position constraint keeps each planned segment inside a narrow corridor. After attachment the tool first moves 25 mm toward the open side of this trellis, then lifts. A straight upward lift would sweep the larger fruit through the overhanging leaf even though the cup fitted beside it. This extraction direction is a configured workcell assumption, not a general tree-understanding algorithm. The orientation constraint keeps the suction axis upright while allowing wrist yaw. Branch geometry has an added clearance margin. MoveIt also includes the held fruit as an attached collision object during transport.
 

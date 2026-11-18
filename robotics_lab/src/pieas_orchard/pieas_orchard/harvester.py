@@ -29,7 +29,7 @@ from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Bool,String
 from pieas_sorting.kinematics import Kinematics,JOINTS,canonical_positions
 from .world import load_config,boxes
-from .motion import StationaryWindow
+from .motion import StationaryWindow,rank_configurations
 from pieas_sorting.task_logic import DropVerifier
 
 # The existing, tested ROS action/service client is still our execution backend.
@@ -118,7 +118,10 @@ class Harvester(ToolSequence):
             velocities=dict(zip(self.state.name,self.state.velocity))
             stamp=self.state.header.stamp.sec+self.state.header.stamp.nanosec*1e-9
             return window.update(stamp,[velocities.get(name,float('nan')) for name in JOINTS])
-        self.spin_until(stationary,5,'fresh stationary joint feedback after execution')
+        try:self.spin_until(stationary,5,'fresh stationary joint feedback after execution')
+        except RuntimeError as error:
+            values={} if self.state is None else dict(zip(self.state.name,zip(self.state.position,self.state.velocity)))
+            raise RuntimeError(f'{error}; final position/velocity feedback: {values}') from error
 
     def command(self,command,timeout=5):
         token=uuid.uuid4().hex
@@ -182,7 +185,9 @@ class Harvester(ToolSequence):
         chosen=None
         # IK only answers where the joints should end. Each candidate must also
         # pass MoveIt's collision check, including the carried object when held.
-        for solution in self.kinematics.candidates(xyz,q):
+        candidates=rank_configurations(list(self.kinematics.candidates(xyz,q)),q,
+            [i for i,name in enumerate(JOINTS) if name in self.kinematics.continuous])
+        for solution in candidates:
             sample=copy.deepcopy(start)
             values=dict(zip(sample.joint_state.name,sample.joint_state.position))
             values.update(zip(JOINTS,solution.tolist()))

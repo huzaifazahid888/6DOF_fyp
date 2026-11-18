@@ -204,3 +204,15 @@ def test_settling_resets_for_motion_invalid_data_and_feedback_gaps():
     assert not w.update(.8,[0.]*6)
     assert not w.update(.9,[0.]*6)
     assert w.update(1.01,[0.]*6)
+
+
+def test_ik_ranking_prefers_nearby_arm_branch_and_wraps_continuous_yaw():
+    from pieas_orchard.motion import rank_configurations
+    current=np.array([-.10363,.27927,-.40566,-.04359,.44052,-.06382])
+    flipped=np.array([.04202,1.1117,-2.79903,.22011,2.57019,.03459])
+    nearby=np.array([.108,-1.752,-.786,.862,-.084,1.727])
+    assert np.array_equal(rank_configurations([flipped,nearby],current,[5])[0],nearby)
+    current=np.array([0.,0.,0.,0.,0.,3.13])
+    wrapped=np.array([0.,0.,0.,0.,0.,-3.13])
+    turn=np.array([0.,0.,0.,0.,0.,2.])
+    assert np.array_equal(rank_configurations([turn,wrapped],current,[5])[0],wrapped)
