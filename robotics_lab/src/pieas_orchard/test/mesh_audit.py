@@ -60,13 +60,13 @@ failures=bool(check(np.zeros(6)))
 q=np.zeros(6)
 targets=[('park',[.24,.02,.23])]
 for i,f in enumerate(c['fruits']):
- x,y,z=f['xyz'];targets += [(f'approach_{i}',[x,y,.23]),(f'pick_{i}',[x,y,z+.017])]
+ x,y,z=f['xyz'];targets += [(f'approach_{i}',[x,y,.23]),(f'pick_{i}',[x,y,z+.017]),(f'extract_{i}',[x+c['motion']['extraction_x_offset'],y,z+.017])]
 for shape,(x,y,z) in c['bins'].items():
  for dx in [-.028,.028]:targets.extend([(shape+'_high',[x+dx,y,.23]),(shape+'_release',[x+dx,y,.14])])
 for name,p in targets:
  errors=[];sol=None
  for candidate in kin.candidates(p,q,32):
-  err=check(candidate, name.endswith('high') or name.endswith('release'))
+  err=check(candidate, name.endswith('high') or name.endswith('release') or name.startswith('extract_'))
   if not err:sol=candidate;break
   errors.append(err)
  print(name,p, 'OK '+str(sol.round(3)) if sol is not None else 'FAIL '+str(errors[:4]),flush=True)
@@ -74,3 +74,4 @@ for name,p in targets:
  else:failures=True
 
 raise SystemExit(1 if failures else 0)
+

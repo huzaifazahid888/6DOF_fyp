@@ -38,6 +38,7 @@ perception:
 motion:
   rail_limit: 0.16
   clearance_z: 0.23
+  extraction_x_offset: -0.025
   release_top_z: 0.14
   endpoint_tolerance: 0.003
   upright_tolerance: 0.12

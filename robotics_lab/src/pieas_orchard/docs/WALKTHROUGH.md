@@ -22,7 +22,7 @@ The candidate must pass size, surface-fit, visible-area, class-confidence and Li
 
 ## 3. Task decisions
 
-`harvester.py` contains the task sequence. Start with `run()`, then follow its calls to `wait_detection()`, `move()`, `command()` and scene helpers. The sequence observes a fruit, approaches from above, descends, attaches, withdraws, transfers, releases and verifies placement.
+`harvester.py` contains the task sequence. Start with `run()`, then follow its calls to `wait_detection()`, `move()`, `command()` and scene helpers. The sequence observes a fruit, approaches from above, descends, attaches, pulls the fruit toward the open side, lifts, transfers, releases and verifies placement.
 
 A visible defect selects the damaged basket. Otherwise the dominant ripe or unripe appearance selects the corresponding basket. Ambiguous detections are rejected instead of assigned a guessed grade. Previously harvested centres are excluded from later observations.
 
@@ -30,7 +30,7 @@ A visible defect selects the damaged basket. Otherwise the dominant ripe or unri
 
 `move()` asks the shared numerical kinematics helper for joint configurations that put `tool0` at the requested XYZ while keeping the suction axis upright. IK produces candidate joint configurations; MoveIt then checks state validity and searches for a path between configurations. These are different operations.
 
-The rail constraint limits translation. During descent and withdrawal, a tool position constraint keeps the planned motion inside a narrow corridor. The orientation constraint keeps the suction axis upright while allowing wrist yaw. Branch geometry has an added clearance margin. MoveIt also includes the held fruit as an attached collision object during transport.
+The rail constraint limits translation. During descent and extraction, a tool position constraint keeps each planned segment inside a narrow corridor. After attachment the tool first moves 25 mm toward the open side of this trellis, then lifts. A straight upward lift would sweep the larger fruit through the overhanging leaf even though the cup fitted beside it. This extraction direction is a configured workcell assumption, not a general tree-understanding algorithm. The orientation constraint keeps the suction axis upright while allowing wrist yaw. Branch geometry has an added clearance margin. MoveIt also includes the held fruit as an attached collision object during transport.
 
 Execution uses the existing trajectory controller. Afterwards, forward kinematics from measured joint feedback verifies the endpoint. Planning success alone does not count as successful movement. The arm can stop on tracking error, stale feedback, invalid state or a contact fault.
 
@@ -55,3 +55,4 @@ A planning failure occurs later: the target may be unreachable, collide with geo
 `test/test_core.py` checks isolated numerical and perception behaviour. `test/mesh_audit.py` checks sampled configurations against the arm meshes. `test/runtime_smoke.py` checks the actual rendered sensors and complete three-fruit batch. These tests answer different questions; their current results are recorded in `VALIDATION.md`.
 
 Future work includes real image training, camera motion and viewpoint selection, flexible branch interaction, a calibrated detachment mechanism and physical original-gripper actuation. Those extensions require additional models and validation rather than only increasing confidence thresholds.
+

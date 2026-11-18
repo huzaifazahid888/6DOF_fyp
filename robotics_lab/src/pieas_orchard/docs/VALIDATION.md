@@ -2,15 +2,19 @@
 
 ## Offline checks
 
-Fifteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame.
+Sixteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability, unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame, padded twig clearance and fruit extraction clearance.
 
-A separate actual-mesh FCL audit found valid sampled home, park, fruit approach/pick and basket endpoint configurations. That check does not prove a continuous collision-free path or successful Gazebo execution.
+A separate actual-mesh FCL audit found valid sampled home, park, fruit approach/pick/extraction and basket endpoint configurations. That check does not prove a continuous collision-free path or successful Gazebo execution.
 
 The learned model's held-out synthetic pixel accuracy is recorded in the model card. Analytic RGB-D fixtures exercise perception separately. Neither replaces evaluation on actual Gazebo sensor output.
 
 ## Runtime acceptance
 
-The dedicated Orchard Jazzy integration workflow builds the plugin and package, runs CPU tests, launches the rendered RGB-D/LiDAR simulation, requires all three fruit grades and executes three verified placements. It also requires no reported robot-tree contact. The initial integration build found an incorrect Gazebo contact-message accessor. That build error was corrected and the next CI build and CPU tests passed. The rendered readiness test then received advancing RGB, depth, LiDAR, joint feedback and backend status, but no accepted fruit detections. That run did not attempt harvesting. Sensor mounting and timestamp synchronization were revised next. Full harvesting acceptance remains pending; a successful build is not a completed orchard demonstration.
+The dedicated Orchard Jazzy integration workflow builds the plugin and package, runs CPU tests, launches the rendered RGB-D/LiDAR simulation, requires all three fruit grades and executes three verified placements. It also requires no reported robot-tree contact.
+
+Run 44108116903 passed build and rendered sensor grading. The arm reached the first fruit with 0.31 mm measured-state FK endpoint error and accepted the grasp. Withdrawal was refused because the detected payload overlapped a padded twig in MoveIt. The twig endpoint now leaves space for branch padding and fruit pose-estimation tolerance. A separate geometry check identified an overhanging leaf on a straight vertical withdrawal, so the task now extracts 25 mm toward the open side before lifting. Both segments keep the payload in collision checking.
+
+Full three-fruit harvesting acceptance remains pending. A successful build, sensor test or sampled geometric check is not a completed orchard demonstration.
 
 Logs are written to `/tmp/pieas_orchard_launch.log`, `/tmp/pieas_orchard_task.log` and `/tmp/pieas_orchard_batch` in CI. Local task results are written under `~/.ros/pieas_orchard/`. The task phase and detections are visible on `/orchard/task_state` and `/orchard/detections`.
 
@@ -24,7 +28,3 @@ The camera and LiDAR are fixed to the robot base mast. This is robot mounting, n
 
 Protected branch/leaf contact is a fault signal. It is not a calibrated force or damage measurement. Hidden internal fruit quality and real ripeness are not observable from this synthetic model. Rejected fruit remains on the tree; the task must not report a completed requested batch when observations are missing.
 
-
-The second rendered attempt localized apples but missed the damaged class. Gamma-aware appearance training fixes that recorded-frame regression. Synchronization now waits for matching frames without treating normal callback gaps as a stability failure. Full task execution is still subject to the dedicated integration result.
-
-Run 44108116903 passed the build and sensor grading acceptance. The arm reached the first fruit with 0.31 mm measured-state FK endpoint error and accepted the grasp. Withdrawal was correctly refused because the detected payload overlapped a padded twig in MoveIt. The twig endpoint was revised to leave space for branch padding and fruit pose-estimation tolerance; collision checking remains enabled. Three-fruit completion is not yet verified.

@@ -52,7 +52,7 @@ class Harvester(ToolSequence):
         self.create_subscription(String,'/orchard/detections',self.detection_callback,10)
         self.create_timer(0.2,lambda:self.heartbeats.publish(Bool(data=True)),clock=Clock(clock_type=ClockType.STEADY_TIME))
         self.placed={name:0 for name in self.c['bins']}
-        self.scene_object=None;self.records=[];self.corridor=None;self.harvested=[]
+        self.scene_object=None;self.records=[];self.corridor=None;self.harvested=[];self.cancelling=False
 
     def machine_callback(self,message):
         value=json.loads(message.data)
@@ -69,11 +69,11 @@ class Harvester(ToolSequence):
         self.phase=name;self.get_logger().info(f'ORCHARD: {name}')
         self.status.publish(String(data=json.dumps({'phase':name,'placed':self.placed})))
 
-    def spin_until(self,predicate,timeout,description):
+    def spin_until(self,predicate,timeout,description,allow_fault=False):
         deadline=time.monotonic()+timeout
         while rclpy.ok() and time.monotonic()<deadline:
             rclpy.spin_once(self,timeout_sec=0.05)
-            if self.reset_detected:raise RuntimeError('Tree contact or world reset: stop this task and relaunch the orchard.')
+            if self.reset_detected and not allow_fault:raise RuntimeError('Tree contact or world reset: stop this task and relaunch the orchard.')
             if predicate():return
         raise RuntimeError('Timeout: '+description)
 
@@ -82,14 +82,20 @@ class Harvester(ToolSequence):
         deadline=time.monotonic()+seconds
         while rclpy.ok() and not future.done() and time.monotonic()<deadline:
             rclpy.spin_once(self,timeout_sec=0.05)
-            if self.reset_detected:raise RuntimeError('Tree contact or Gazebo reset during task; relaunch required.')
-            if self.executing:
+            if self.reset_detected and not self.cancelling:raise RuntimeError('Tree contact or Gazebo reset during task; relaunch required.')
+            if self.executing and not self.cancelling:
                 if time.monotonic()-self.machine_wall>3 or time.monotonic()-self.received>3:
                     raise RuntimeError('Execution feedback stopped; cancellation requested.')
                 if self.expect_payload and self.machine and not self.machine['held']:
                     raise RuntimeError('Suction attachment lost during execution.')
         if not future.done():raise RuntimeError('ROS request timed out.')
         return future.result()
+
+    def cancel(self):
+        # A latched contact fault must not abort the cancellation handshake.
+        self.cancelling=True
+        try:return super().cancel()
+        finally:self.cancelling=False
 
     def execute_leg(self,trajectory):
         self.executing=True
@@ -106,7 +112,7 @@ class Harvester(ToolSequence):
                 return True
             self.commands.publish(String(data=f'{token}|{command}'))
             return False
-        self.spin_until(acknowledged,timeout,'orchard '+command)
+        self.spin_until(acknowledged,timeout,'orchard '+command,allow_fault=command=='stop')
 
     def scene(self,objects=(),attached=(),matrix=None):
         scene=PlanningScene(is_diff=True)
@@ -306,7 +312,14 @@ class Harvester(ToolSequence):
             self.phase_to('DETACH_STEM_AND_GRIP');self.command('grip')
             self.spin_until(lambda:self.machine['held'],3,'attachment acknowledgement')
             self.expect_payload=True;self.attach_scene(obj)
-            self.move(approach,'WITHDRAW_FRUIT');self.corridor=None
+            # Pull toward the open side before lifting the larger fruit past
+            # the overhanging leaf. Both segments retain payload collision checks.
+            extracted=[pickup[0]+self.c['motion']['extraction_x_offset'],pickup[1],pickup[2]]
+            lifted=[extracted[0],extracted[1],clearance]
+            self.corridor=(pickup,extracted)
+            self.move(extracted,'EXTRACT_FROM_FOLIAGE')
+            self.corridor=(extracted,lifted)
+            self.move(lifted,'LIFT_CLEAR');self.corridor=None
             bx,by,_=self.c['bins'][grade]
             bx+=(-.028 if self.placed[grade]==0 else .028)
             self.move([bx,by,clearance],'TRANSFER_TO_'+grade.upper())
@@ -369,7 +382,7 @@ def main():
             try:node.command('stop',2)
             except Exception:pass
             # Keep an attached payload attached on failure; do not drop it blindly.
-        else:print('Factory initialization failed:',error)
+        else:print('Orchard initialization failed:',error)
     finally:
         if node is not None:node.destroy_node()
         rclpy.shutdown()

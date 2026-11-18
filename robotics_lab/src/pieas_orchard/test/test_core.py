@@ -168,3 +168,15 @@ def test_branch_padding_leaves_room_for_fruit_estimation_error():
         padded_near=centre[0]-size[0]/2-C['motion']['branch_margin']
         fruit_far=fruit['xyz'][0]+C['fruit_radius']+C['motion']['endpoint_tolerance']
         assert padded_near>fruit_far
+
+
+def test_reference_extraction_clears_overhanging_leaf():
+    geometry={name:(np.array(xyz),np.array(size)/2) for name,xyz,size,_ in boxes(C)}
+    for i,fruit in enumerate(C['fruits']):
+        centre=np.array(fruit['xyz']);leaf,half=geometry[f'leaf_guard_{i}']
+        extracted=centre+np.array([C['motion']['extraction_x_offset'],0,0])
+        lifted=extracted.copy();lifted[2]=C['motion']['clearance_z']-C['fruit_radius']
+        for start,end in [(centre,extracted),(extracted,lifted)]:
+            for p in np.linspace(start,end,100):
+                nearest=np.clip(p,leaf-half,leaf+half)
+                assert np.linalg.norm(p-nearest)>C['fruit_radius']+C['motion']['endpoint_tolerance']
