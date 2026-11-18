@@ -29,6 +29,7 @@ from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Bool,String
 from pieas_sorting.kinematics import Kinematics,JOINTS,canonical_positions
 from .world import load_config,boxes
+from .motion import StationaryWindow
 from pieas_sorting.task_logic import DropVerifier
 
 # The existing, tested ROS action/service client is still our execution backend.
@@ -103,6 +104,21 @@ class Harvester(ToolSequence):
         self.execution_timeout=max(180,5*(duration.sec+duration.nanosec*1e-9)+30)
         try:return super().execute_leg(trajectory)
         finally:self.executing=False
+
+    def wait_for_settle(self):
+        # Action completion and the final joint-state callback arrive separately.
+        # Require fresh samples over a short stable interval, not a fixed sleep.
+        window=StationaryWindow(self.get_clock().now().nanoseconds*1e-9)
+        def stationary():
+            if time.monotonic()-self.machine_wall>1. or time.monotonic()-self.received>1.:
+                raise RuntimeError('Feedback stopped while waiting for the arm to settle.')
+            if self.expect_payload and not self.machine['held']:
+                raise RuntimeError('Payload attachment lost while settling.')
+            if self.state is None:return False
+            velocities=dict(zip(self.state.name,self.state.velocity))
+            stamp=self.state.header.stamp.sec+self.state.header.stamp.nanosec*1e-9
+            return window.update(stamp,[velocities.get(name,float('nan')) for name in JOINTS])
+        self.spin_until(stationary,5,'fresh stationary joint feedback after execution')
 
     def command(self,command,timeout=5):
         token=uuid.uuid4().hex
@@ -211,6 +227,7 @@ class Harvester(ToolSequence):
         delta[-1]=math.atan2(math.sin(delta[-1]),math.cos(delta[-1]))
         if np.any(np.abs(delta)>np.array([.002,.01,.01,.01,.01,.01])):raise RuntimeError('Robot moved during planning.')
         self.execute_leg(plan)
+        self.wait_for_settle()
         actual=self.measured()
         pose=self.forward(actual)
         error=self.distance(self.xyz(pose),xyz)

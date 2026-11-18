@@ -32,7 +32,7 @@ A visible defect selects the damaged basket. Otherwise the dominant ripe or unri
 
 The rail constraint limits translation. During descent and extraction, a tool position constraint keeps each planned segment inside a narrow corridor. After attachment the tool first moves 25 mm toward the open side of this trellis, then lifts. A straight upward lift would sweep the larger fruit through the overhanging leaf even though the cup fitted beside it. This extraction direction is a configured workcell assumption, not a general tree-understanding algorithm. The orientation constraint keeps the suction axis upright while allowing wrist yaw. Branch geometry has an added clearance margin. MoveIt also includes the held fruit as an attached collision object during transport.
 
-Execution uses the existing trajectory controller. Afterwards, forward kinematics from measured joint feedback verifies the endpoint. Planning success alone does not count as successful movement. The arm can stop on tracking error, stale feedback, invalid state or a contact fault.
+Execution uses the existing trajectory controller. Afterwards, `motion.py` requires fresh stationary joint feedback for 0.2 simulation seconds. This avoids treating an earlier moving sample as the final state. The wait has a timeout and does not relax the velocity limits. Then forward kinematics from measured joint feedback verifies the endpoint. Planning success alone does not count as successful movement. The arm can stop on tracking error, stale feedback, invalid state or a contact fault.
 
 ## 5. Simulated grasp and release
 

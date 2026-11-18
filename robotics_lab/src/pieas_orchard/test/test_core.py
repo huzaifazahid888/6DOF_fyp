@@ -180,3 +180,27 @@ def test_reference_extraction_clears_overhanging_leaf():
             for p in np.linspace(start,end,100):
                 nearest=np.clip(p,leaf-half,leaf+half)
                 assert np.linalg.norm(p-nearest)>C['fruit_radius']+C['motion']['endpoint_tolerance']
+
+
+def test_settling_requires_fresh_continuous_stationary_feedback():
+    from pieas_orchard.motion import StationaryWindow
+    w=StationaryWindow(10.)
+    assert not w.update(9.9,[0.]*6)
+    assert not w.update(10.01,[0.]*6)
+    assert not w.update(10.01,[0.]*6)
+    assert not w.update(10.11,[0.]*6)
+    assert w.update(10.22,[0.]*6)
+
+
+def test_settling_resets_for_motion_invalid_data_and_feedback_gaps():
+    from pieas_orchard.motion import StationaryWindow
+    w=StationaryWindow(0.)
+    assert not w.update(.01,[0.]*6)
+    assert not w.update(.1,[0.,0.,.02,0.,0.,0.])
+    assert not w.update(.2,[0.]*6)
+    assert not w.update(.3,[0.]*6)
+    assert not w.update(.4,[float('nan')]*6)
+    assert not w.update(.5,[0.]*6)
+    assert not w.update(.8,[0.]*6)
+    assert not w.update(.9,[0.]*6)
+    assert w.update(1.01,[0.]*6)
