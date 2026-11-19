@@ -1,40 +1,88 @@
-# PIEAS Robotic Arm: Embedded Control and ROS 2 Simulation
+# Ongoing Work: Intelligent Robotics in Simulation
 
-This project started as my final year BS Electrical Engineering thesis at PIEAS in 2024. Our team worked on supervised teleoperation of a six-DOF manipulator using STM32 controllers, encoder feedback and CAN communication. My work now continues with the same arm model in ROS 2, Gazebo and MoveIt, with a focus on motion planning, perception and pick-and-place tasks.
+I am extending my bachelor's robotic arm project into a platform for studying perception, motion planning and autonomous manipulation. The original project involved simulation and embedded control on the physical arm. The ongoing work uses the same arm model in **ROS 2, Gazebo and MoveIt 2** to develop and test new applications.
 
-The reason for this extension is simple: I want to connect robotics algorithms with a working system and study their behaviour through repeatable experiments before moving to hardware.
+My objective is to connect what the robot observes with how it moves and how it checks the result of a task. The work has progressed from basic joint control to conveyor sorting and, more recently, apple harvesting. These extensions are simulation experiments; they have not yet been deployed on the physical arm.
 
-Supervisor for the original thesis: Dr. Nasir Rehman Jadoon.
+[Simulation workspace](robotics_lab/README.md) · [Code reading guide](robotics_lab/docs/CODE_GUIDE.md) · [Original FYP and thesis](#original-fyp)
 
-![Original PIEAS arm](6_DOF.png)
+## Development objectives and progress
 
-## Project development
+### 1. Build a working simulation of the original arm
 
-The simulation workspace develops through five stages. The orchard experiment extends the same arm into a separate application alongside conveyor sorting.
+**Objective:** bring the existing robot into a repeatable environment for control and planning experiments.
 
-| Stage | Work and purpose | Documentation |
-| --- | --- | --- |
-| 1. Robot model and Gazebo | Recover the original geometry and joint chain, then establish a model that loads and reports joint states. | [Robot description](robotics_lab/src/pieas_arm_description/README.md) |
-| 2. Joint control | Connect timed joint commands to simulated motion and compare the command with feedback. | [Control experiments](robotics_lab/src/pieas_arm_control/README.md) |
-| 3. Motion planning | Add collision checking, joint-space planning, inverse kinematics and tool-position tasks. | [MoveIt integration](robotics_lab/src/pieas_arm_moveit_config/README.md) |
-| 4. Factory sorting | Use RGB-D and LiDAR measurements to classify parts, choose a bin and run a pick-and-place sequence. | [Conveyor sorting cell](robotics_lab/src/pieas_sorting/README.md) |
-| 5. Apple harvesting | Detect partially visible apples, plan around a trellis and sort fruit by simulated appearance. | [Orchard workcell](robotics_lab/src/pieas_orchard/README.md) |
+I recovered the geometry and joint structure from the original CoppeliaSim model and integrated the robot with Gazebo and ROS 2 controllers. The first experiments sent timed joint commands and compared the requested positions with joint feedback. This established the connection between the robot description, controller and simulated motion.
 
-The simulated chain contains one linear rail joint and five rotary joints. The original gripper is a rigid model; opening and closing its fingers is a separate development task.
+The model has one linear rail joint and five rotary joints.
 
-## Current work
+[Robot model and Gazebo setup](robotics_lab/src/pieas_arm_description/README.md) · [Joint control experiments](robotics_lab/src/pieas_arm_control/README.md)
 
-Basic joint motion, MoveIt planning and a three-leg tool-position sequence have been exercised in Gazebo. A six-object sorting batch also completed locally with the simulation suction tool. These are simulation results, not a claim of hardware-ready autonomous operation.
+### 2. Move from joint commands to collision-aware tool motion
 
-The current factory launch has since been changed to display the original gripper. The sorting application still uses suction pickup assumptions, so that combination is not yet a working finger-grasping system. My next step is to preserve the suction mode and add a selectable original-gripper mode with finger joints, control and grasp verification. The factory sensors remain fixed overhead. The separate orchard package adds a camera and LiDAR on a mast attached to the fixed robot base. Its [validation record](robotics_lab/src/pieas_orchard/docs/VALIDATION.md) separates implemented features from verified runtime results.
+**Objective:** specify where the tool should move and find a feasible path through the robot's workspace.
 
-[Progress and results](robotics_lab/EXPERIMENTS.md) · [Planned improvements](robotics_lab/docs/ROADMAP.md)
+I added MoveIt 2 for inverse kinematics, collision checking, path planning and trajectory timing. RViz provides a view of the planning scene and proposed motion, while Gazebo runs the trajectory through the robot controller. The experiments include joint targets, tool-position sequences and planning around obstacles.
 
-## Working with the repository
+Measured joint feedback is used to check whether the tool reached the requested position. This connects kinematics and planning with the robot's actual simulated response.
 
-The simulation targets Ubuntu 24.04, ROS 2 Jazzy and Gazebo Harmonic. The [workspace overview](robotics_lab/README.md) explains the packages, and the [setup guide](robotics_lab/START_HERE.md) covers installation and launch commands. The [code reading guide](robotics_lab/docs/CODE_GUIDE.md) explains the file types and the order in which the code runs.
+[Motion planning and tool-position experiments](robotics_lab/src/pieas_arm_moveit_config/README.md)
 
-## Original hardware project
+### 3. Connect perception and manipulation through conveyor sorting
+
+**Objective:** identify an arriving object, estimate its position and place it in the correct bin.
+
+The factory scenario includes an indexed conveyor, an RGB-D camera, LiDAR and three types of parts: cubes, rectangular blocks and cylinders. Image geometry determines the shape class, depth estimates position and size, and LiDAR provides an additional height and presence check. A task sequence connects detection, motion planning, pickup, release and placement verification.
+
+A six-part batch completed with the simulation suction tool. Work on using the original gripper is still ongoing: the current factory launch displays its geometry, but finger actuation and physical gripping have not been implemented. The factory documentation records this configuration difference.
+
+[Conveyor sorting application](robotics_lab/src/pieas_sorting/README.md) · [Results and current limitations](robotics_lab/src/pieas_sorting/docs/VALIDATION.md)
+
+### 4. Extend the robot to fruit harvesting and appearance-based sorting
+
+**Objective:** use sensor observations to locate fruit near foliage, plan its removal and select a basket from its observed appearance.
+
+The separate orchard application uses a scaled apple trellis within the arm's reach. An RGB-D camera and LiDAR are mounted on a visible mast attached to the robot's fixed base. A small trained neural network classifies image pixels, while depth-based sphere fitting estimates fruit position and size. LiDAR checks the observed surface, and repeated observations help reject unstable detections.
+
+The robot approaches a detected apple, attaches the simulation suction tool, extracts the fruit toward the open side of the trellis and lifts it clear. MoveIt includes the carried fruit in collision checking. IK candidates are ranked by joint travel to avoid unnecessary arm flips, and feedback checks confirm that motion has settled before the next step.
+
+**The three-fruit scenario has completed in both an automated Gazebo test and a local run.** Ripe, unripe and visibly damaged fruit reached their matching baskets. The automated batch reported no contact with the protected tree geometry.
+
+This is the first working harvesting baseline. The classifier is trained on synthetic appearance samples, and the demonstrated scene exposes most of each apple. Partial-occlusion behaviour is also tested with analytic fixtures. These results do not establish recognition in dense real foliage or biological damage prevention.
+
+[Apple harvesting application](robotics_lab/src/pieas_orchard/README.md) · [Implementation walkthrough](robotics_lab/src/pieas_orchard/docs/WALKTHROUGH.md) · [Verified results](robotics_lab/src/pieas_orchard/docs/VALIDATION.md) · [Appearance model](robotics_lab/src/pieas_orchard/models/MODEL_CARD.md)
+
+## Direction of the ongoing work
+
+The main focus is intelligent manipulation: combining learned perception with geometric reasoning, motion planning and feedback-based decisions. Conveyor sorting provides a controlled starting point. Harvesting adds appearance variation, foliage and constraints on how the fruit can be removed.
+
+Next, I plan to test varied fruit positions, stronger occlusion and changing lighting, then explore better camera viewpoints and recovery from failed detections or grasps. These experiments will help evaluate reliability beyond a single configured scene.
+
+Fruit ripeness and health assessment are further directions. The current system uses synthetic red/green appearance and visible blemishes. Real ripeness and health assessment will require labelled images and suitable reference measurements; internal quality and disease are not measured by this implementation.
+
+Mechanical work includes actuated fingers for the original gripper and better-calibrated grasp, contact and detachment models. These are needed to study hardware transfer and the risk of damaging fruit or branches.
+
+## Explore the ongoing work
+
+The simulation workspace targets Ubuntu 24.04, ROS 2 Jazzy and Gazebo Harmonic. Each application has its own documentation, configuration and launch entry point.
+
+[Workspace overview](robotics_lab/README.md) · [Installation and launch guide](robotics_lab/START_HERE.md) · [Code reading guide](robotics_lab/docs/CODE_GUIDE.md) · [Development roadmap](robotics_lab/docs/ROADMAP.md)
+
+---
+
+<a id="original-fyp"></a>
+
+# Supervised Teleoperation Control System for a 6 DOF Serial Chain Manipulator
+
+Final year BS thesis project (Electrical Engineering, PIEAS, 2024) on designing and building the embedded control system for a 6 degree of freedom robotic arm, with a focus on precise motor control and a master-slave communication architecture over CAN bus.
+
+Supervisor: Dr. Nasir Rehman Jadoon
+
+<p align="left">
+<img src="6_DOF.png" width="400">
+</p>
+
+## What this project does
 
 The arm has 6 joints, and each joint is driven by its own DC motor controlled by a dedicated STM32F103C8T6 microcontroller. A separate STM32 acts as the master controller, computes the inverse kinematics for a given target position, and sends the required joint angles (as encoder counts) to each joint controller over CAN bus. Each slave controller then closes its own position control loop using encoder feedback and drives the motor through an IBT-2 driver until it reaches the target.
 
@@ -67,9 +115,8 @@ Each joint uses a closed-loop PID position controller based on encoder feedback.
 
 ##  Thesis Report  
 
-The complete thesis is available here:  [**6DOF_Control – Full PDF Report**](./6DOF_Robotic_Manipulator_Thesis.pdf)
+You can read the complete report here:  [**6DOF_Control – Full PDF Report**](./6DOF_Robotic_Manipulator_Thesis.pdf)
 
 ## Notes
 
 This was a team project completed as a BS thesis at PIEAS.
-
