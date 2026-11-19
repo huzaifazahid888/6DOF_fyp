@@ -2,7 +2,7 @@
 
 ## Offline checks
 
-Nineteen CPU tests passed during initial development. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability, unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame, padded twig clearance and fruit extraction clearance.
+Nineteen CPU tests passed. They cover three appearance grades, metric sphere fitting, partial and heavy occlusion, missing LiDAR, invalid/flat depth, temporal stability, shared scene geometry, sensor mounts, unchanged arm joint transforms, numerical reachability, unobstructed LiDAR mounting sightlines and a recorded Gazebo RGB-D/LiDAR regression frame, padded twig clearance and fruit extraction clearance, feedback settling and IK candidate ranking.
 
 A separate actual-mesh FCL audit found valid sampled home, park, fruit approach/pick/extraction and basket endpoint configurations. That check does not prove a continuous collision-free path or successful Gazebo execution.
 
@@ -10,13 +10,31 @@ The learned model's held-out synthetic pixel accuracy is recorded in the model c
 
 ## Runtime acceptance
 
-The dedicated Orchard Jazzy integration workflow builds the plugin and package, runs CPU tests, launches the rendered RGB-D/LiDAR simulation, requires all three fruit grades and executes three verified placements. It also requires no reported robot-tree contact.
+The first complete three-fruit baseline passed in [Orchard Jazzy integration run 44363924055](https://github.com/huzaifazahid888/6DOF_fyp/actions/runs/44363924055), using code commit `adfd674d3e4e2848a37470ebaafce6ca3fb8507e`.
 
-Run 44108116903 passed build and rendered sensor grading. The arm reached the first fruit with 0.31 mm measured-state FK endpoint error and accepted the grasp. Withdrawal was refused because the detected payload overlapped a padded twig in MoveIt. The twig endpoint now leaves space for branch padding and fruit pose-estimation tolerance. A separate geometry check identified an overhanging leaf on a straight vertical withdrawal, so the task now extracts 25 mm toward the open side before lifting. Both segments keep the payload in collision checking.
+| Check | Observed result |
+| --- | --- |
+| Build and CPU tests | Passed |
+| Rendered RGB-D and LiDAR | Advancing sensor data; all three grades detected |
+| Ripe fruit | Verified in ripe basket |
+| Unripe fruit | Verified in unripe basket |
+| Visibly damaged fruit | Verified in damaged basket |
+| Protected tree contact | None reported during the batch |
+| Final task state | `ORCHARD: COMPLETE` |
 
-Run 44257288248 completed verified ripe and unripe placements, then extracted and transferred the damaged fruit. It stopped after the last basket descent because the immediate feedback check still reported joint motion. The task now waits for fresh stationary feedback over 0.2 simulation seconds, with a bounded timeout, before checking the measured endpoint. Stale feedback, contact and payload-loss checks remain active. Run 44360954610 repeated two placements but reached the settling timeout at the damaged-basket descent. Its IK had selected a distant flipped arm configuration. Candidate selection now ranks joint travel before collision checking, and settling failures include actual position/velocity values. Full three-fruit harvesting acceptance remains pending. A successful build, sensor test or sampled geometric check is not a completed orchard demonstration.
+This is a successful configured scenario, not a reliability estimate across arbitrary trees or random placements. The initial scene exposes most of each fruit surface. Separate analytic fixtures test partial occlusion and rejection of heavily occluded observations; this run does not establish dense-canopy harvesting performance.
 
-Logs are written to `/tmp/pieas_orchard_launch.log`, `/tmp/pieas_orchard_task.log` and `/tmp/pieas_orchard_batch` in CI. Local task results are written under `~/.ros/pieas_orchard/`. The task phase and detections are visible on `/orchard/task_state` and `/orchard/detections`.
+A subsequent local run on 19 November 2026 also reached `ORCHARD: COMPLETE`. Its terminal log recorded 25 measured-state FK endpoint checks, ranging from 0.13 to 0.54 mm with a mean of 0.318 mm, below the configured 3 mm tolerance. Log timestamps span approximately 484 seconds (8 minutes 4 seconds). These are model-based tool-position errors calculated from joint feedback, not independently measured physical fruit-placement accuracy. The local CSV is named `batch_20261119_113614.csv`.
+
+The bins need no geometry change for this three-fruit baseline. Each release is followed by a check that the fruit has settled inside the selected basket. Larger batches, different fruit sizes and stacking need separate capacity and placement validation.
+
+## Changes made during validation
+
+The first grasp exposed an overlap between a detected fruit and padded twig geometry. The twig endpoint now leaves space for branch padding and pose-estimation tolerance. Withdrawal first extracts 25 mm toward the open side, then lifts, keeping the carried fruit in collision checking.
+
+Earlier trials completed two placements but stopped at the damaged-basket descent. Waiting for fresh stationary feedback alone did not resolve that failure. Ranking IK candidates by joint travel before collision checking avoided the distant arm configuration selected by the first-solution approach. The final successful run includes both candidate ranking and the bounded stationary-feedback check. Collision checks and the 3 mm endpoint tolerance remain enabled.
+
+Logs are written to `/tmp/pieas_orchard_launch.log`, `/tmp/pieas_orchard_task.log` and `/tmp/pieas_orchard_batch` in CI. Local task results are written under `~/.ros/pieas_orchard/`. Task phase and detections are visible on `/orchard/task_state` and `/orchard/detections`.
 
 ## Model boundaries
 

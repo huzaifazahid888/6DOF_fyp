@@ -6,6 +6,8 @@ I am extending the arm from conveyor sorting to fruit harvesting. This separate 
 
 This is a scaled simulation workcell. The apples are 32 mm in diameter, branches are rigid, and suction/stem detachment uses checked physics joints. It is not a full-size orchard deployment or a validated model of fruit bruising and branch fracture.
 
+The configured three-fruit batch has passed the automated Jazzy/Gazebo integration test and a subsequent local run. Each fruit reached its matching basket. [Validation results](docs/VALIDATION.md) describe the tested scenario and its limits.
+
 ## Current implementation
 
 RGB and depth come from a camera on a visible mast attached to the robot's fixed base. A second sensor on the mast supplies LiDAR points. A small trained neural network labels image pixels; connected regions and robust sphere fitting estimate fruit centres and radii. LiDAR corroborates the surface. A visible blemish takes priority over the ripeness class when selecting a basket.
@@ -49,6 +51,7 @@ The current acceptance status and any known runtime failures are recorded in [VA
 | --- | --- |
 | [orchard.yaml](config/orchard.yaml) | Scene dimensions, fruit appearance, basket locations and thresholds |
 | [harvester.py](pieas_orchard/harvester.py) | Observe, approach, detach, carry, grade and verify sequence |
+| [motion.py](pieas_orchard/motion.py) | Nearby IK candidate ranking and fresh stationary feedback checks |
 | [vision.py](pieas_orchard/vision.py) | Learned segmentation, sphere fitting, grading and occlusion rejection |
 | [perception.py](pieas_orchard/perception.py) | ROS sensor inputs, timing and stable observations |
 | [orchard_system.cpp](src/orchard_system.cpp) | Stem attachment, suction interlocks and tree-contact status |
