@@ -18,11 +18,11 @@ from pieas_sorting.world import load_config,build_world,robot_variant
 
 
 def generate_launch_description():
-    package=Path(get_package_share_directory('pieas_sorting'))
+    package=Path(get_package_share_directory('pieas_sorting')) #Path is a class imported from pathlib, so we are created package as path object
     description_package=Path(get_package_share_directory('pieas_arm_description'))
-    moveit=Path(get_package_share_directory('pieas_arm_moveit_config'))
-    config_path=package/'config/cell.yaml';c=load_config(config_path)
-    directory=Path(tempfile.mkdtemp(prefix='pieas_factory_'))
+    moveit=Path(get_package_share_directory('pieas_arm_moveit_config')) #MoveIt configuration and RViz settings
+    config_path=package/'config/cell.yaml';c=load_config(config_path) # Construct the cell.yaml path, then load its settings into the dictionary c.
+    directory=Path(tempfile.mkdtemp(prefix='pieas_factory_'))# Create a unique temporary directory for the factory files generated during this launch.
     (directory/'cell.sdf').write_text(build_world(c))
     #(directory/'suction.urdf').write_text(robot_variant(description_package/'urdf/pieas_control.urdf.in'))
     # Use the original robot description without replacing the gripper.
@@ -30,7 +30,7 @@ def generate_launch_description():
     prepare=runpy.run_path(str(description_package/'launch/lab.launch.py'))['prepare_world']
     try:
         description,world_path,generated=prepare(description_package,directory/'cell.sdf',directory/'suction.urdf')
-    except Exception:
+    except Exception: # Delete temporary files and rethrow the error if world preparation fails.
         shutil.rmtree(directory,ignore_errors=True);raise
     def clean(event,context):
         shutil.rmtree(directory,ignore_errors=True);shutil.rmtree(generated,ignore_errors=True)
