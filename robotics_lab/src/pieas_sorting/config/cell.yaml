@@ -33,13 +33,13 @@ lidar:
   xyz: [0.36, 0.0, 0.85]
   rpy: [0.0, 1.5707963267948966, 0.0]
 perception:
-  roi_half_x: 0.035
+  roi_half_x: 0.035 #region of interest 
   roi_half_y: 0.045
   minimum_height: 0.012
   maximum_height: 0.060
   lidar_height_tolerance: 0.012
-  minimum_lidar_points: 5
-  stable_frames: 4
+  minimum_lidar_points: 5  # Require at least 5 nearby LiDAR returns to support the detected object.
+  stable_frames: 4        # Accept after 4 consecutive observations with the same shape and less than 2 mm position change between observations.
 motion:
   rail_limit: 0.16
   clearance_z: 0.22
